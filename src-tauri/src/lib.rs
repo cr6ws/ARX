@@ -1,0 +1,118 @@
+mod vault;
+
+use std::sync::Mutex;
+
+use tauri::State;
+
+use vault::security;
+use vault::service;
+use vault::storage;
+use vault::types::{VaultEntryInput, VaultEntrySummary, VaultSession, VaultStatus};
+
+pub struct AppState {
+    session: Mutex<VaultSession>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            session: Mutex::new(VaultSession::new()),
+        }
+    }
+}
+
+#[tauri::command]
+fn vault_status() -> Result<VaultStatus, String> {
+    Ok(VaultStatus {
+        has_vault: storage::vault_exists()?,
+    })
+}
+
+#[tauri::command]
+fn init_vault(master_password: String, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    service::init_vault(&mut session, &master_password)
+}
+
+#[tauri::command]
+fn unlock_vault(master_password: String, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    service::unlock_vault(&mut session, &master_password)
+}
+
+#[tauri::command]
+fn lock_vault(state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    session.clear();
+    Ok(())
+}
+
+#[tauri::command]
+fn add_password(entry: VaultEntryInput, state: State<AppState>) -> Result<VaultEntrySummary, String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    let normalized = security::normalize_entry_input(&entry);
+    security::validate_entry_input(&normalized)?;
+    service::add_entry(&mut session, normalized)
+}
+
+#[tauri::command]
+fn get_passwords(state: State<AppState>) -> Result<Vec<VaultEntrySummary>, String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::list_entries(&session)
+}
+
+#[tauri::command]
+fn get_password(id: String, state: State<AppState>) -> Result<String, String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::get_password(&session, &id)
+}
+
+#[tauri::command]
+fn delete_password(id: String, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::delete_entry(&mut session, &id)
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .manage(AppState::default())
+        .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![
+            vault_status,
+            init_vault,
+            unlock_vault,
+            lock_vault,
+            add_password,
+            get_passwords,
+            get_password,
+            delete_password,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
