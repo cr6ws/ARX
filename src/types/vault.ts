@@ -54,3 +54,13 @@ export type VaultSettings = {
 };
 
 export type SidebarSection = "overview" | "audit" | "passwords" | "settings";
+
+export type AuditStats = {
+  totalEntries: number;
+  weakCount: number;
+  mediumCount: number;
+  strongCount: number;
+  reusedCount: number;
+  oldCount: number;
+};
+

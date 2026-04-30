@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Download, Upload } from "lucide-react";
 
@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import type { AppTheme, SidebarSection, VaultSettings } from "../types/vault";
+import type { SidebarSection, VaultSettings } from "../types/vault";
 
 const STORAGE_KEY = "veryfied-settings";
 
@@ -100,6 +100,7 @@ export function SettingsPage({
                 <Label htmlFor="default-section" className="text-xs uppercase tracking-widest text-white/40">Landing Page</Label>
                 <select
                   id="default-section"
+                  title="Landing Page"
                   value={settings.defaultSection}
                   onChange={(e) => onSettingsChange({ ...settings, defaultSection: e.target.value as SidebarSection })}
                   className="h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-white/35"
@@ -117,6 +118,8 @@ export function SettingsPage({
                   <p className="text-[11px] text-white/40">Denser table layout</p>
                 </div>
                 <input
+                  aria-label="Compact rows"
+                  title="Compact rows"
                   type="checkbox"
                   checked={settings.compactRows}
                   onChange={(e) => onSettingsChange({ ...settings, compactRows: e.target.checked })}

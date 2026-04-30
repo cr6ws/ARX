@@ -116,6 +116,18 @@ pub struct VaultStatus {
     pub hint: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditStats {
+    pub total_entries: usize,
+    pub weak_count: usize,
+    pub medium_count: usize,
+    pub strong_count: usize,
+    pub reused_count: usize,
+    pub old_count: usize,
+}
+
+
 pub struct VaultSession {
     pub unlocked: bool,
     pub key: Option<Vec<u8>>,

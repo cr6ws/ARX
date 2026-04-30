@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, AlertTriangle, ShieldCheck, Trash2, X } from "lucide-react";
+import { Download, AlertTriangle, ShieldCheck, X } from "lucide-react";
 
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import type { VaultEntrySummary } from "../types/vault";
 
 type Issue = {

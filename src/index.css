@@ -116,3 +116,13 @@ nav button.bg-white\/10 {
   background: var(--theme-border);
   border-radius: 10px;
 }
+
+@keyframes breach-scan {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(200%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-breach-scan {
+  animation: breach-scan 3s infinite linear;
+}

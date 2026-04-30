@@ -29,7 +29,6 @@ import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "./components/ui/card";
@@ -41,6 +40,8 @@ import { StarsBackground } from "./components/animate-ui/components/backgrounds/
 import { PasswordsPage } from "./pages/PasswordsPage";
 import { SecurityAuditPage } from "./pages/SecurityAuditPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SecurityDashboard } from "./components/SecurityDashboard";
+
 import type {
   SidebarSection,
   VaultEntry,
@@ -70,8 +71,6 @@ const DEFAULT_SETTINGS: VaultSettings = {
   theme: "obsidian",
 };
 
-
-
 type AddAccountRow = {
   id: string;
   username: string;
@@ -80,7 +79,10 @@ type AddAccountRow = {
 
 function createAddAccountRow(overrides?: Partial<AddAccountRow>) {
   return {
-    id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    id:
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`,
     username: "",
     password: "",
     ...overrides,
@@ -92,11 +94,11 @@ const navigationItems: Array<{
   label: string;
   section: SidebarSection;
 }> = [
-    { icon: LayoutGrid, label: "All Items", section: "overview" },
-    { icon: ShieldCheck, label: "Security Audit", section: "audit" },
-    { icon: KeyRound, label: "Passwords", section: "passwords" },
-    { icon: Sparkles, label: "Settings", section: "settings" },
-  ];
+  { icon: LayoutGrid, label: "All Items", section: "overview" },
+  { icon: ShieldCheck, label: "Security Audit", section: "audit" },
+  { icon: KeyRound, label: "Passwords", section: "passwords" },
+  { icon: Sparkles, label: "Settings", section: "settings" },
+];
 
 function App() {
   const [mode, setMode] = useState<VaultMode>("loading");
@@ -115,11 +117,14 @@ function App() {
   const [newEntry, setNewEntry] = useState<VaultEntryInput>(EMPTY_ENTRY);
   const [addLabel, setAddLabel] = useState("");
   const [addWebsite, setAddWebsite] = useState("");
-  const [addRows, setAddRows] = useState<AddAccountRow[]>([createAddAccountRow()]);
+  const [addRows, setAddRows] = useState<AddAccountRow[]>([
+    createAddAccountRow(),
+  ]);
   const [revealId, setRevealId] = useState<string | null>(null);
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeSection, setActiveSection] = useState<SidebarSection>("overview");
+  const [activeSection, setActiveSection] =
+    useState<SidebarSection>("overview");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -150,7 +155,10 @@ function App() {
     if (!query) return null;
 
     const exactMatch = filteredEntries.find((entry) => {
-      return entry.label.trim().toLowerCase() === query || entry.username.trim().toLowerCase() === query;
+      return (
+        entry.label.trim().toLowerCase() === query ||
+        entry.username.trim().toLowerCase() === query
+      );
     });
 
     return (exactMatch ?? filteredEntries[0])?.id ?? null;
@@ -179,20 +187,20 @@ function App() {
     }
   }, [activeSection]);
 
-  const activeSectionSummary = useMemo(() => {
-    return "";
-  }, []);
-
   useEffect(() => {
     let alive = true;
     const loadStatus = async () => {
       setIsBusy(true);
       setError(null);
       try {
-        const status = await invoke<VaultStatus & { hint?: string }>("vault_status");
+        const status = await invoke<VaultStatus & { hint?: string }>(
+          "vault_status",
+        );
         if (!alive) return;
         setVaultHint(status.hint ?? null);
-        setMode(status.isUnlocked ? "unlocked" : decideInitialMode(status.hasVault));
+        setMode(
+          status.isUnlocked ? "unlocked" : decideInitialMode(status.hasVault),
+        );
       } catch (err) {
         if (!alive) return;
         setError(String(err));
@@ -256,9 +264,9 @@ function App() {
     setIsBusy(true);
     setError(null);
     try {
-      const key = await invoke<string>("init_vault", { 
-        masterPassword, 
-        hint: masterPasswordHint.trim() || null 
+      const key = await invoke<string>("init_vault", {
+        masterPassword,
+        hint: masterPasswordHint.trim() || null,
       });
       setRecoveryKey(key);
       setMasterPassword("");
@@ -322,7 +330,9 @@ function App() {
       setRecoveryInput("");
       setIsRecovering(false);
       setMode("unlocked");
-      setSuccess("Vault recovered successfully! You can now change your master password in Settings.");
+      setSuccess(
+        "Vault recovered successfully! You can now change your master password in Settings.",
+      );
     } catch (err) {
       setError(String(err));
     } finally {
@@ -368,7 +378,9 @@ function App() {
       return;
     }
 
-    const validRows = addRows.filter((row) => row.username.trim() && row.password.length >= 8);
+    const validRows = addRows.filter(
+      (row) => row.username.trim() && row.password.length >= 8,
+    );
 
     if (validRows.length === 0) {
       setError("Add at least one username and password row.");
@@ -544,11 +556,13 @@ function App() {
       const content = JSON.stringify(backup, null, 2);
 
       const filePath = await save({
-        filters: [{
-          name: 'JSON',
-          extensions: ['json']
-        }],
-        defaultPath: `arx-vault-backup-${Date.now()}.json`
+        filters: [
+          {
+            name: "JSON",
+            extensions: ["json"],
+          },
+        ],
+        defaultPath: `arx-vault-backup-${Date.now()}.json`,
       });
 
       if (filePath) {
@@ -566,10 +580,12 @@ function App() {
     try {
       const selected = await open({
         multiple: false,
-        filters: [{
-          name: 'JSON',
-          extensions: ['json']
-        }]
+        filters: [
+          {
+            name: "JSON",
+            extensions: ["json"],
+          },
+        ],
       });
 
       if (selected && !Array.isArray(selected)) {
@@ -586,7 +602,9 @@ function App() {
         setRevealId(null);
         setRevealedPassword(null);
         setMode("locked");
-        setSuccess("Vault imported. Please unlock with the backup's master password.");
+        setSuccess(
+          "Vault imported. Please unlock with the backup's master password.",
+        );
       }
     } catch (err) {
       setError(String(err));
@@ -597,17 +615,42 @@ function App() {
     if (mode !== "unlocked") return;
 
     const bumpActivity = () => setActivityTick((value) => value + 1);
-    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "scroll", "mousemove", "focus"];
+    const events: Array<keyof WindowEventMap> = [
+      "pointerdown",
+      "keydown",
+      "scroll",
+      "mousemove",
+      "focus",
+      "touchstart",
+      "wheel",
+    ];
 
-    events.forEach((eventName) => window.addEventListener(eventName, bumpActivity, { passive: true }));
+    events.forEach((eventName) =>
+      window.addEventListener(eventName, bumpActivity, { passive: true }),
+    );
 
-    const timer = window.setTimeout(() => {
-      void handleLock();
-    }, settings.autoLockMinutes * 60 * 1000);
+    // Also lock when the window is hidden for more than 1 minute (optional but good for security)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // If hidden, we could potentially lock sooner, 
+        // but for now we'll just keep the idle timer running.
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const timer = window.setTimeout(
+      () => {
+        void handleLock();
+      },
+      settings.autoLockMinutes * 60 * 1000,
+    );
 
     return () => {
       window.clearTimeout(timer);
-      events.forEach((eventName) => window.removeEventListener(eventName, bumpActivity));
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      events.forEach((eventName) =>
+        window.removeEventListener(eventName, bumpActivity),
+      );
     };
   }, [activityTick, handleLock, mode, settings.autoLockMinutes]);
 
@@ -640,8 +683,14 @@ function App() {
         <div className="flex min-h-screen items-center justify-center px-4 text-white">
           <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
             <CardContent className="flex flex-col items-center gap-6 px-8 py-10 text-center">
-              <img src={arxLogo} alt="ARX" className="h-28 w-28 object-contain" />
-              <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">ARX</CardTitle>
+              <img
+                src={arxLogo}
+                alt="ARX"
+                className="h-28 w-28 object-contain"
+              />
+              <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">
+                ARX
+              </CardTitle>
             </CardContent>
           </Card>
         </div>
@@ -657,8 +706,14 @@ function App() {
             <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
               <CardContent className="space-y-6 px-8 py-10">
                 <div className="flex flex-col items-center gap-5 text-center">
-                  <img src={arxLogo} alt="ARX" className="h-28 w-28 object-contain" />
-                  <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">ARX</CardTitle>
+                  <img
+                    src={arxLogo}
+                    alt="ARX"
+                    className="h-28 w-28 object-contain"
+                  />
+                  <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">
+                    ARX
+                  </CardTitle>
                 </div>
 
                 {error && (
@@ -670,28 +725,44 @@ function App() {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="unlock-password" className="text-sm text-white/80">
-                      {mode === "setup" ? "New master password" : "Master password"}
+                    <Label
+                      htmlFor="unlock-password"
+                      className="text-sm text-white/80"
+                    >
+                      {mode === "setup"
+                        ? "New master password"
+                        : "Master password"}
                     </Label>
                     <Input
                       id="unlock-password"
                       type="password"
                       value={masterPassword}
-                      onChange={(event) => setMasterPassword(event.target.value)}
-                      placeholder={mode === "setup" ? "Create master password" : "Enter master password"}
+                      onChange={(event) =>
+                        setMasterPassword(event.target.value)
+                      }
+                      placeholder={
+                        mode === "setup"
+                          ? "Create master password"
+                          : "Enter master password"
+                      }
                       className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
                     />
                   </div>
 
                   {mode === "setup" && (
                     <div className="space-y-2">
-                      <Label htmlFor="setup-hint" className="text-sm text-white/80">
+                      <Label
+                        htmlFor="setup-hint"
+                        className="text-sm text-white/80"
+                      >
                         Password hint (optional)
                       </Label>
                       <Input
                         id="setup-hint"
                         value={masterPasswordHint}
-                        onChange={(event) => setMasterPasswordHint(event.target.value)}
+                        onChange={(event) =>
+                          setMasterPasswordHint(event.target.value)
+                        }
                         placeholder="e.g. My childhood pet's name"
                         className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
                       />
@@ -703,7 +774,10 @@ function App() {
                   {isRecovering ? (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
                       <div className="space-y-2">
-                        <Label htmlFor="recovery-key" className="text-sm text-white/80">
+                        <Label
+                          htmlFor="recovery-key"
+                          className="text-sm text-white/80"
+                        >
                           Emergency Recovery Key
                         </Label>
                         <Input
@@ -714,7 +788,8 @@ function App() {
                           className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20 font-mono uppercase"
                         />
                         <p className="text-[10px] text-white/40 uppercase tracking-widest text-center px-4 leading-relaxed">
-                          Enter your emergency key to restore access without your password.
+                          Enter your emergency key to restore access without
+                          your password.
                         </p>
                       </div>
                       <Button
@@ -734,7 +809,9 @@ function App() {
                   ) : (
                     <>
                       <Button
-                        onClick={mode === "setup" ? handleInitVault : handleUnlock}
+                        onClick={
+                          mode === "setup" ? handleInitVault : handleUnlock
+                        }
                         disabled={isBusy}
                         size="lg"
                         className="h-12 w-full rounded-2xl border border-white bg-white text-sm font-semibold text-black shadow-none hover:bg-white/90"
@@ -780,17 +857,21 @@ function App() {
         </StarsBackground>
 
         {isRecoveryKeyModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl space-y-6">
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold text-white">Your Emergency Recovery Key</h3>
+                <h3 className="text-xl font-semibold text-white">
+                  Your Emergency Recovery Key
+                </h3>
                 <p className="text-sm text-white/60">
-                  If you ever lose your master password, this is the <span className="text-white font-bold">ONLY WAY</span> to recover your data.
+                  If you ever lose your master password, this is the{" "}
+                  <span className="text-white font-bold">ONLY WAY</span> to
+                  recover your data.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center space-y-4">
-                <div 
+                <div
                   className="p-4 bg-black/40 rounded-xl border border-white/20 font-mono text-xl tracking-wider select-all cursor-pointer hover:bg-black/60 transition-colors text-white"
                   onClick={() => {
                     if (recoveryKey) {
@@ -805,13 +886,17 @@ function App() {
                   Click the key to copy. Save it somewhere secure.
                 </p>
               </div>
-              
+
               <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/70">
                 <ShieldCheck className="size-5 shrink-0 text-white/40" />
-                <p>Store this key in a physical safe, a printed document, or a separate secure location. Without it, your passwords are unrecoverable if you forget your password.</p>
+                <p>
+                  Store this key in a physical safe, a printed document, or a
+                  separate secure location. Without it, your passwords are
+                  unrecoverable if you forget your password.
+                </p>
               </div>
 
-              <Button 
+              <Button
                 className="w-full h-12 rounded-2xl bg-white text-black font-semibold hover:bg-white/90"
                 onClick={() => setIsRecoveryKeyModalOpen(false)}
               >
@@ -831,7 +916,11 @@ function App() {
           <div className="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/80">
-                <img src={arxLogo} alt="ARX" className="size-4 rounded-full object-contain" />
+                <img
+                  src={arxLogo}
+                  alt="ARX"
+                  className="size-4 rounded-full object-contain"
+                />
                 ARX
               </div>
             </div>
@@ -908,10 +997,15 @@ function App() {
             </header>
 
             {error && (
-              <Alert variant="destructive" className="border-white/10 bg-white/5 text-white">
+              <Alert
+                variant="destructive"
+                className="border-white/10 bg-white/5 text-white"
+              >
                 <AlertTriangle className="size-4 text-white" />
                 <AlertTitle className="text-white">Action failed</AlertTitle>
-                <AlertDescription className="text-white/75">{error}</AlertDescription>
+                <AlertDescription className="text-white/75">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
 
@@ -919,7 +1013,9 @@ function App() {
               <Alert className="border-white/10 bg-white/5 text-white">
                 <ShieldCheck className="size-4 text-white" />
                 <AlertTitle className="text-white">Success</AlertTitle>
-                <AlertDescription className="text-white/75">{success}</AlertDescription>
+                <AlertDescription className="text-white/75">
+                  {success}
+                </AlertDescription>
               </Alert>
             )}
 
@@ -930,82 +1026,102 @@ function App() {
             </section>
 
             {activeSection === "overview" && (
-              <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
-                <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                  <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <CardTitle className="text-xl text-white">Vault Health</CardTitle>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={handleRunAudit}
-                        className="rounded-full border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
-                      >
-                        Run Audit
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-5 px-6 py-6">
-                    <div className="rounded-[22px] border border-white/10 bg-black/20 p-5">
-                      <div className="flex items-center justify-between gap-4 text-sm text-white/60">
-                        <span>Vault score</span>
-                        <span>{vaultHealth}%</span>
-                      </div>
-                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className={`vault-progress-${progressBucket} h-full rounded-full bg-linear-to-r from-white to-zinc-400 shadow-[0_0_24px_rgba(255,255,255,0.18)]`}
-                        />
-                      </div>
-                      <p className="mt-4 text-sm leading-7 text-white/70">
-                        Local encrypted storage active.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      {[
-                        { label: "Encrypted", value: "AES-GCM" },
-                        { label: "Sync", value: "Off" },
-                        { label: "State", value: isBusy ? "Busy" : "Ready" },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className="rounded-[22px] border border-white/10 bg-black/20 p-4"
+              <section className="space-y-6">
+                <SecurityDashboard />
+                
+                <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
+                  <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                    <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-xl text-white">
+                            Vault Health
+                          </CardTitle>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={handleRunAudit}
+                          className="rounded-full border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
                         >
-                          <p className="text-xs uppercase tracking-[0.22em] text-white/45">{item.label}</p>
-                          <p className="mt-2 text-base font-medium text-white">{item.value}</p>
+                          Run Audit
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-5 px-6 py-6">
+                      <div className="rounded-[22px] border border-white/10 bg-black/20 p-5">
+                        <div className="flex items-center justify-between gap-4 text-sm text-white/60">
+                          <span>Vault score</span>
+                          <span>{vaultHealth}%</span>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className={`vault-progress-${progressBucket} h-full rounded-full bg-linear-to-r from-white to-zinc-400 shadow-[0_0_24px_rgba(255,255,255,0.18)]`}
+                          />
+                        </div>
+                        <p className="mt-4 text-sm leading-7 text-white/70">
+                          Local encrypted storage active.
+                        </p>
+                      </div>
 
-                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-1">
-                  <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                    <CardContent className="space-y-2 px-6 py-6">
-                      <p className="text-xs uppercase tracking-[0.22em] text-white/45">Total items</p>
-                      <p className="text-5xl font-semibold tracking-tight text-white">{totalItems}</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                    <CardContent className="space-y-3 px-6 py-6">
-                      <p className="text-xs uppercase tracking-[0.22em] text-white/45">Recent activity</p>
-                      <div className="space-y-3">
-                        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
-                          {totalItems > 0 ? `${totalItems} entries available.` : "Awaiting first vault item."}
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
-                          No cloud sync. No plaintext secrets.
-                        </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {[
+                          { label: "Encrypted", value: "AES-GCM" },
+                          { label: "Sync", value: "Off" },
+                          { label: "State", value: isBusy ? "Busy" : "Ready" },
+                        ].map((item) => (
+                          <div
+                            key={item.label}
+                            className="rounded-[22px] border border-white/10 bg-black/20 p-4"
+                          >
+                            <p className="text-xs uppercase tracking-[0.22em] text-white/45">
+                              {item.label}
+                            </p>
+                            <p className="mt-2 text-base font-medium text-white">
+                              {item.value}
+                            </p>
+                          </div>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>
-                </div>
+
+                  <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-1">
+                    <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                      <CardContent className="space-y-2 px-6 py-6">
+                        <p className="text-xs uppercase tracking-[0.22em] text-white/45">
+                          Total items
+                        </p>
+                        <p className="text-5xl font-semibold tracking-tight text-white">
+                          {totalItems}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                      <CardContent className="space-y-3 px-6 py-6">
+                        <p className="text-xs uppercase tracking-[0.22em] text-white/45">
+                          Recent activity
+                        </p>
+                        <div className="space-y-3">
+                          <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
+                            {totalItems > 0
+                              ? `${totalItems} entries available.`
+                              : "Awaiting first vault item."}
+                          </div>
+                          <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
+                            No cloud sync. No plaintext secrets.
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </section>
               </section>
             )}
 
-            {activeSection === "audit" && <SecurityAuditPage entries={entries} auditRunId={auditRunId} />}
+            {activeSection === "audit" && (
+              <SecurityAuditPage entries={entries} auditRunId={auditRunId} />
+            )}
             {activeSection === "passwords" && (
               <PasswordsPage
                 entries={filteredEntries}
@@ -1035,14 +1151,18 @@ function App() {
       </div>
 
       {isAddModalMounted && (
-        <div className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center transition-opacity duration-200 ease-out ${isAddModalVisible ? "opacity-100" : "opacity-0"}`}>
+        <div
+          className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center transition-opacity duration-200 ease-out ${isAddModalVisible ? "opacity-100" : "opacity-0"}`}
+        >
           <button
             type="button"
             className="absolute inset-0 cursor-default"
             aria-label="Close add item dialog"
             onClick={closeAddModal}
           />
-          <Card className={`relative z-10 flex w-full max-w-2xl max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)] transition-opacity duration-200 ease-out ${isAddModalVisible ? "opacity-100" : "opacity-0"}`}>
+          <Card
+            className={`relative z-10 flex w-full max-w-2xl max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)] transition-opacity duration-200 ease-out ${isAddModalVisible ? "opacity-100" : "opacity-0"}`}
+          >
             <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -1062,24 +1182,51 @@ function App() {
             <CardContent className="flex-1 space-y-6 overflow-y-auto px-6 py-6 pr-3">
               <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-white">Categorize & Prioritize</p>
-                  <p className="text-xs text-white/40">Select a folder and toggle favorite status.</p>
+                  <p className="text-sm font-medium text-white">
+                    Categorize & Prioritize
+                  </p>
+                  <p className="text-xs text-white/40">
+                    Select a folder and toggle favorite status.
+                  </p>
                 </div>
                 <button
-                  onClick={() => setNewEntry(prev => ({ ...prev, isFavorite: !prev.isFavorite }))}
+                  type="button"
+                  aria-label="Toggle favorite"
+                  title="Toggle favorite"
+                  onClick={() =>
+                    setNewEntry((prev) => ({
+                      ...prev,
+                      isFavorite: !prev.isFavorite,
+                    }))
+                  }
                   className={`p-2.5 rounded-xl border transition-all ${newEntry.isFavorite ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-500" : "bg-white/5 border-white/10 text-white/40 hover:text-white"}`}
                 >
-                  <Star className={`size-5 ${newEntry.isFavorite ? "fill-current" : ""}`} />
+                  <Star
+                    className={`size-5 ${newEntry.isFavorite ? "fill-current" : ""}`}
+                  />
                 </button>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {(["Personal", "Work", "Social", "Finance", "Other"] as const).map((cat) => {
-                  const Icon = cat === "Personal" ? User : cat === "Work" ? Briefcase : cat === "Social" ? Share2 : cat === "Finance" ? Wallet : ShieldIcon;
+                {(
+                  ["Personal", "Work", "Social", "Finance", "Other"] as const
+                ).map((cat) => {
+                  const Icon =
+                    cat === "Personal"
+                      ? User
+                      : cat === "Work"
+                        ? Briefcase
+                        : cat === "Social"
+                          ? Share2
+                          : cat === "Finance"
+                            ? Wallet
+                            : ShieldIcon;
                   return (
                     <button
                       key={cat}
-                      onClick={() => setNewEntry(prev => ({ ...prev, category: cat }))}
+                      onClick={() =>
+                        setNewEntry((prev) => ({ ...prev, category: cat }))
+                      }
                       className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium ${newEntry.category === cat ? "bg-white text-slate-950 border-white" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white"}`}
                     >
                       <Icon className="size-4" />
@@ -1091,42 +1238,79 @@ function App() {
               {editingEntryId ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="entry-label-modal" className="text-white/80">Label</Label>
+                    <Label
+                      htmlFor="entry-label-modal"
+                      className="text-white/80"
+                    >
+                      Label
+                    </Label>
                     <Input
                       id="entry-label-modal"
                       value={newEntry.label}
-                      onChange={(e) => setNewEntry(prev => ({ ...prev, label: e.target.value }))}
+                      onChange={(e) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          label: e.target.value,
+                        }))
+                      }
                       placeholder="e.g. Dribbble"
                       className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="entry-username-modal" className="text-white/80">Username</Label>
+                    <Label
+                      htmlFor="entry-username-modal"
+                      className="text-white/80"
+                    >
+                      Username
+                    </Label>
                     <Input
                       id="entry-username-modal"
                       value={newEntry.username}
-                      onChange={(e) => setNewEntry(prev => ({ ...prev, username: e.target.value }))}
+                      onChange={(e) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          username: e.target.value,
+                        }))
+                      }
                       placeholder="alex@example.com"
                       className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="entry-password-modal" className="text-white/80">Password</Label>
+                    <Label
+                      htmlFor="entry-password-modal"
+                      className="text-white/80"
+                    >
+                      Password
+                    </Label>
                     <Input
                       id="entry-password-modal"
                       type="password"
                       value={newEntry.password}
-                      onChange={(e) => setNewEntry(prev => ({ ...prev, password: e.target.value }))}
+                      onChange={(e) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          password: e.target.value,
+                        }))
+                      }
                       placeholder="Minimum 8 characters"
                       className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="entry-url-modal" className="text-white/80">Website</Label>
+                    <Label htmlFor="entry-url-modal" className="text-white/80">
+                      Website
+                    </Label>
                     <Input
                       id="entry-url-modal"
                       value={newEntry.url}
-                      onChange={(e) => setNewEntry(prev => ({ ...prev, url: e.target.value }))}
+                      onChange={(e) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          url: e.target.value,
+                        }))
+                      }
                       placeholder="https://"
                       className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
@@ -1136,7 +1320,12 @@ function App() {
                 <div className="space-y-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="entry-label-modal" className="text-white/80">Label</Label>
+                      <Label
+                        htmlFor="entry-label-modal"
+                        className="text-white/80"
+                      >
+                        Label
+                      </Label>
                       <Input
                         id="entry-label-modal"
                         value={addLabel}
@@ -1146,7 +1335,12 @@ function App() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="entry-url-modal" className="text-white/80">Website</Label>
+                      <Label
+                        htmlFor="entry-url-modal"
+                        className="text-white/80"
+                      >
+                        Website
+                      </Label>
                       <Input
                         id="entry-url-modal"
                         value={addWebsite}
@@ -1159,11 +1353,18 @@ function App() {
 
                   <div className="space-y-3 rounded-[22px] border border-white/10 bg-black/20 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-white">Account rows</p>
+                      <p className="text-sm font-medium text-white">
+                        Account rows
+                      </p>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setAddRows(current => [...current, createAddAccountRow()])}
+                        onClick={() =>
+                          setAddRows((current) => [
+                            ...current,
+                            createAddAccountRow(),
+                          ])
+                        }
                         className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
                       >
                         <Plus className="mr-2 size-4" />
@@ -1173,35 +1374,68 @@ function App() {
 
                     <div className="space-y-3">
                       {addRows.map((row, index) => (
-                        <div key={row.id} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                        <div
+                          key={row.id}
+                          className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+                        >
                           <div className="space-y-2">
-                            <Label className="text-white/80" htmlFor={`row-username-${row.id}`}>
+                            <Label
+                              className="text-white/80"
+                              htmlFor={`row-username-${row.id}`}
+                            >
                               Username {index + 1}
                             </Label>
                             <Input
                               id={`row-username-${row.id}`}
                               value={row.username}
-                              onChange={(e) => setAddRows(current => current.map(item => item.id === row.id ? { ...item, username: e.target.value } : item))}
+                              onChange={(e) =>
+                                setAddRows((current) =>
+                                  current.map((item) =>
+                                    item.id === row.id
+                                      ? { ...item, username: e.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
                               placeholder="john@gmail.com"
                               className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-white/80" htmlFor={`row-password-${row.id}`}>
+                            <Label
+                              className="text-white/80"
+                              htmlFor={`row-password-${row.id}`}
+                            >
                               Password
                             </Label>
                             <Input
                               id={`row-password-${row.id}`}
                               type="password"
                               value={row.password}
-                              onChange={(e) => setAddRows(current => current.map(item => item.id === row.id ? { ...item, password: e.target.value } : item))}
+                              onChange={(e) =>
+                                setAddRows((current) =>
+                                  current.map((item) =>
+                                    item.id === row.id
+                                      ? { ...item, password: e.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
                               placeholder="Minimum 8 characters"
                               className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                             />
                           </div>
                           <Button
                             variant="outline"
-                            onClick={() => setAddRows(current => current.length === 1 ? current : current.filter(item => item.id !== row.id))}
+                            onClick={() =>
+                              setAddRows((current) =>
+                                current.length === 1
+                                  ? current
+                                  : current.filter(
+                                      (item) => item.id !== row.id,
+                                    ),
+                              )
+                            }
                             disabled={addRows.length === 1}
                             className="h-11 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 disabled:opacity-50"
                           >

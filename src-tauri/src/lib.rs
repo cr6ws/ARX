@@ -129,6 +129,16 @@ fn get_passwords(state: State<AppState>) -> Result<Vec<VaultEntrySummary>, Strin
 }
 
 #[tauri::command]
+fn get_audit_stats(state: State<AppState>) -> Result<crate::vault::types::AuditStats, String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::get_audit_stats(&session)
+}
+
+#[tauri::command]
 fn get_password(id: String, state: State<AppState>) -> Result<String, String> {
     let session = state
         .session
@@ -219,6 +229,7 @@ pub fn run() {
             import_vault,
             change_master_password,
             recover_vault,
+            get_audit_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

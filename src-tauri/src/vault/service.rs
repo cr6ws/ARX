@@ -144,6 +144,87 @@ pub fn list_entries(session: &VaultSession) -> Result<Vec<VaultEntrySummary>, St
     Ok(items)
 }
 
+pub fn get_audit_stats(session: &VaultSession) -> Result<crate::vault::types::AuditStats, String> {
+    let entries = &session.vault_data.entries;
+    let total_entries = entries.len();
+    let mut weak_count = 0;
+    let mut medium_count = 0;
+    let mut strong_count = 0;
+    let mut reused_count = 0;
+    let mut old_count = 0;
+
+    let mut passwords = std::collections::HashMap::new();
+    let now = now_epoch();
+    let six_months_secs = 180 * 24 * 60 * 60;
+
+    for entry in entries {
+        // Strength
+        match calculate_strength(&entry.password) {
+            Strength::Weak => weak_count += 1,
+            Strength::Medium => medium_count += 1,
+            Strength::Strong => strong_count += 1,
+        }
+
+        // Reuse
+        let count = passwords.entry(entry.password.clone()).or_insert(0);
+        *count += 1;
+
+        // Old
+        if now - entry.updated_at > six_months_secs {
+            old_count += 1;
+        }
+    }
+
+    // Count how many entries use a reused password
+    // Actually, the user wants "accounts that share the same password".
+    // If 3 accounts share password A, and 2 share password B, that's 5 entries.
+    for (_, count) in passwords {
+        if count > 1 {
+            reused_count += count;
+        }
+    }
+
+    Ok(crate::vault::types::AuditStats {
+        total_entries,
+        weak_count,
+        medium_count,
+        strong_count,
+        reused_count,
+        old_count,
+    })
+}
+
+enum Strength {
+    Weak,
+    Medium,
+    Strong,
+}
+
+fn calculate_strength(password: &str) -> Strength {
+    let len = password.len();
+    if len < 8 {
+        return Strength::Weak;
+    }
+
+    let has_upper = password.chars().any(|c| c.is_uppercase());
+    let has_lower = password.chars().any(|c| c.is_lowercase());
+    let has_digit = password.chars().any(|c| c.is_digit(10));
+    let has_special = password.chars().any(|c| !c.is_alphanumeric());
+
+    let types_count = [has_upper, has_lower, has_digit, has_special]
+        .iter()
+        .filter(|&&b| b)
+        .count();
+
+    if len >= 12 && types_count >= 3 {
+        Strength::Strong
+    } else if len >= 8 && types_count >= 2 {
+        Strength::Medium
+    } else {
+        Strength::Weak
+    }
+}
+
 pub fn get_password(session: &VaultSession, id: &str) -> Result<String, String> {
     let entry = session
         .vault_data
