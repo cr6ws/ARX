@@ -27,19 +27,37 @@ fn vault_status(state: State<AppState>) -> Result<VaultStatus, String> {
         .session
         .lock()
         .map_err(|_| "State lock poisoned.".to_string())?;
+
+    let path = storage::vault_path()?;
+    let mut hint = None;
+    if path.exists() {
+        if let Ok(file) = storage::read_vault_file(&path) {
+            hint = file.hint_b64.and_then(|h| {
+                use base64::engine::general_purpose::STANDARD;
+                use base64::Engine as _;
+                STANDARD.decode(h).ok().and_then(|b| String::from_utf8(b).ok())
+            });
+        }
+    }
+
     Ok(VaultStatus {
-        has_vault: storage::vault_exists()?,
+        has_vault: path.exists(),
         is_unlocked: session.unlocked,
+        hint,
     })
 }
 
 #[tauri::command]
-fn init_vault(master_password: String, state: State<AppState>) -> Result<(), String> {
+fn init_vault(
+    master_password: String,
+    hint: Option<String>,
+    state: State<AppState>,
+) -> Result<String, String> {
     let mut session = state
         .session
         .lock()
         .map_err(|_| "State lock poisoned.".to_string())?;
-    service::init_vault(&mut session, &master_password)
+    service::init_vault(&mut session, &master_password, hint)
 }
 
 #[tauri::command]
@@ -159,6 +177,25 @@ fn import_vault(backup: VaultBackup, state: State<AppState>) -> Result<(), Strin
     service::import_backup(&mut session, backup)
 }
 
+#[tauri::command]
+fn change_master_password(new_password: String, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::change_master_password(&mut session, &new_password)
+}
+
+#[tauri::command]
+fn recover_vault(recovery_key: String, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    service::recover_vault(&mut session, &recovery_key)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -178,6 +215,8 @@ pub fn run() {
             delete_password,
             export_vault,
             import_vault,
+            change_master_password,
+            recover_vault,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

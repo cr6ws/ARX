@@ -59,18 +59,7 @@ const DEFAULT_SETTINGS: VaultSettings = {
   compactRows: false,
 };
 
-function generatePassword(length = 20) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*_-";
-  const values = crypto.getRandomValues(new Uint32Array(length));
-  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
-}
 
-function parseTagsText(tagsText: string) {
-  return tagsText
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-}
 
 type AddAccountRow = {
   id: string;
@@ -92,22 +81,29 @@ const navigationItems: Array<{
   label: string;
   section: SidebarSection;
 }> = [
-  { icon: LayoutGrid, label: "All Items", section: "overview" },
-  { icon: ShieldCheck, label: "Security Audit", section: "audit" },
-  { icon: KeyRound, label: "Passwords", section: "passwords" },
-  { icon: Sparkles, label: "Settings", section: "settings" },
-];
+    { icon: LayoutGrid, label: "All Items", section: "overview" },
+    { icon: ShieldCheck, label: "Security Audit", section: "audit" },
+    { icon: KeyRound, label: "Passwords", section: "passwords" },
+    { icon: Sparkles, label: "Settings", section: "settings" },
+  ];
 
 function App() {
   const [mode, setMode] = useState<VaultMode>("loading");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [masterPassword, setMasterPassword] = useState("");
+  const [masterPasswordHint, setMasterPasswordHint] = useState("");
+  const [vaultHint, setVaultHint] = useState<string | null>(null);
+  const [showHint, setShowHint] = useState(false);
+  const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
+  const [isRecoveryKeyModalOpen, setIsRecoveryKeyModalOpen] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoveryInput, setRecoveryInput] = useState("");
   const [entries, setEntries] = useState<VaultEntrySummary[]>([]);
   const [newEntry, setNewEntry] = useState<VaultEntryInput>(EMPTY_ENTRY);
   const [addLabel, setAddLabel] = useState("");
   const [addWebsite, setAddWebsite] = useState("");
-  const [addTagsText, setAddTagsText] = useState("");
   const [addRows, setAddRows] = useState<AddAccountRow[]>([createAddAccountRow()]);
   const [revealId, setRevealId] = useState<string | null>(null);
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
@@ -115,7 +111,7 @@ function App() {
   const [activeSection, setActiveSection] = useState<SidebarSection>("overview");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
-  const [entryTagsText, setEntryTagsText] = useState("");
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [settings, setSettings] = useState<VaultSettings>(DEFAULT_SETTINGS);
   const [activityTick, setActivityTick] = useState(0);
   const [auditRunId, setAuditRunId] = useState(0);
@@ -127,7 +123,7 @@ function App() {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return entries;
     return entries.filter((entry) => {
-      const haystack = [entry.label, entry.username, entry.url ?? "", entry.tags.join(" ")]
+      const haystack = [entry.label, entry.username, entry.url ?? ""]
         .join(" ")
         .toLowerCase();
       return haystack.includes(query);
@@ -160,7 +156,7 @@ function App() {
       case "audit":
         return "Security Audit";
       case "passwords":
-        return "Passwords";
+        return "Password Manager";
       case "settings":
         return "Settings";
       default:
@@ -169,17 +165,8 @@ function App() {
   }, [activeSection]);
 
   const activeSectionSummary = useMemo(() => {
-    switch (activeSection) {
-      case "audit":
-        return "Audit checks should eventually flag weak passwords, duplicates, stale entries, and missing security metadata.";
-      case "passwords":
-        return "This section should become the full password browser for viewing, searching, revealing, copying, editing, and deleting entries.";
-      case "settings":
-        return "Settings should stay security-focused: auto-lock, reveal timeout, export/import, and sync posture.";
-      default:
-        return "Your secure digital life, encrypted and organized locally.";
-    }
-  }, [activeSection]);
+    return "";
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -187,8 +174,9 @@ function App() {
       setIsBusy(true);
       setError(null);
       try {
-        const status = await invoke<VaultStatus>("vault_status");
+        const status = await invoke<VaultStatus & { hint?: string }>("vault_status");
         if (!alive) return;
+        setVaultHint(status.hint ?? null);
         setMode(status.isUnlocked ? "unlocked" : decideInitialMode(status.hasVault));
       } catch (err) {
         if (!alive) return;
@@ -227,13 +215,10 @@ function App() {
   }, [mode]);
 
   useEffect(() => {
-    if (!revealedPassword) return;
-    const timer = window.setTimeout(() => {
-      setRevealId(null);
-      setRevealedPassword(null);
-    }, 10000);
+    if (!success) return;
+    const timer = window.setTimeout(() => setSuccess(null), 3000);
     return () => window.clearTimeout(timer);
-  }, [revealedPassword]);
+  }, [success]);
 
   const loadEntries = async () => {
     setIsBusy(true);
@@ -256,8 +241,14 @@ function App() {
     setIsBusy(true);
     setError(null);
     try {
-      await invoke("init_vault", { masterPassword });
+      const key = await invoke<string>("init_vault", { 
+        masterPassword, 
+        hint: masterPasswordHint.trim() || null 
+      });
+      setRecoveryKey(key);
       setMasterPassword("");
+      setMasterPasswordHint("");
+      setIsRecoveryKeyModalOpen(true);
       setMode("unlocked");
     } catch (err) {
       setError(String(err));
@@ -293,7 +284,6 @@ function App() {
       setSearchTerm("");
       setIsAddModalOpen(false);
       setEditingEntryId(null);
-      setEntryTagsText("");
       setNewEntry(EMPTY_ENTRY);
       setRevealId(null);
       setRevealedPassword(null);
@@ -309,31 +299,47 @@ function App() {
     }
   };
 
-  const handleResetVault = async () => {
-    const confirmed = window.confirm(
-      "This will permanently delete the local vault on this device and you will need to create a new one.",
-    );
-    if (!confirmed) return;
-
+  const handleRecoverVault = async () => {
     setIsBusy(true);
     setError(null);
+    try {
+      await invoke("recover_vault", { recoveryKey: recoveryInput.trim() });
+      setRecoveryInput("");
+      setIsRecovering(false);
+      setMode("unlocked");
+      setSuccess("Vault recovered successfully! You can now change your master password in Settings.");
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleResetVault = async () => {
+    setIsBusy(true);
+    setError(null);
+    setSuccess(null);
     try {
       await invoke("reset_vault");
       setEntries([]);
       setNewEntry(EMPTY_ENTRY);
-      setEntryTagsText("");
       setAddLabel("");
       setAddWebsite("");
-      setAddTagsText("");
       setAddRows([createAddAccountRow()]);
       setSearchTerm("");
       setMasterPassword("");
+      setMasterPasswordHint("");
+      setVaultHint(null);
+      setRecoveryKey(null);
+      setRecoveryInput("");
+      setIsRecovering(false);
       setRevealId(null);
       setRevealedPassword(null);
       setIsAddModalOpen(false);
       setEditingEntryId(null);
       setActiveSection("overview");
       setMode("setup");
+      setSuccess("Vault has been wiped successfully.");
     } catch (err) {
       setError(String(err));
     } finally {
@@ -347,7 +353,6 @@ function App() {
       return;
     }
 
-    const commonTags = parseTagsText(addTagsText);
     const validRows = addRows.filter((row) => row.username.trim() && row.password.length >= 8);
 
     if (validRows.length === 0) {
@@ -364,7 +369,7 @@ function App() {
           username: newEntry.username.trim(),
           password: newEntry.password,
           url: newEntry.url?.trim() ? newEntry.url.trim() : undefined,
-          tags: commonTags,
+          tags: [],
         };
         await invoke("update_password", { id: editingEntryId, entry: payload });
       } else {
@@ -375,16 +380,14 @@ function App() {
               username: row.username.trim(),
               password: row.password,
               url: addWebsite.trim() ? addWebsite.trim() : undefined,
-              tags: commonTags,
+              tags: [],
             },
           });
         }
       }
       setNewEntry(EMPTY_ENTRY);
-      setEntryTagsText("");
       setAddLabel("");
       setAddWebsite("");
-      setAddTagsText("");
       setAddRows([createAddAccountRow()]);
       setEditingEntryId(null);
       setIsAddModalOpen(false);
@@ -410,6 +413,11 @@ function App() {
   };
 
   const handleReveal = async (id: string) => {
+    if (revealId === id) {
+      setRevealId(null);
+      setRevealedPassword(null);
+      return;
+    }
     setIsBusy(true);
     setError(null);
     try {
@@ -447,19 +455,31 @@ function App() {
     setError(null);
     setEditingEntryId(null);
     setNewEntry(EMPTY_ENTRY);
-    setEntryTagsText("");
     setAddLabel("");
     setAddWebsite("");
-    setAddTagsText("");
     setAddRows([createAddAccountRow()]);
     setIsAddModalOpen(true);
+  };
+
+  const openResetConfirm = () => {
+    setError(null);
+    setIsResetConfirmOpen(true);
+  };
+
+  const closeResetConfirm = () => {
+    if (isBusy) return;
+    setIsResetConfirmOpen(false);
+  };
+
+  const confirmResetVault = async () => {
+    setIsResetConfirmOpen(false);
+    await handleResetVault();
   };
 
   const closeAddModal = () => {
     setIsAddModalOpen(false);
     setAddLabel("");
     setAddWebsite("");
-    setAddTagsText("");
     setAddRows([createAddAccountRow()]);
   };
 
@@ -483,7 +503,6 @@ function App() {
         notes: fullEntry.notes ?? "",
         tags: fullEntry.tags,
       });
-      setEntryTagsText(fullEntry.tags.join(", "));
       setIsAddModalOpen(true);
     } catch (err) {
       setError(String(err));
@@ -497,6 +516,8 @@ function App() {
   };
 
   const handleExportBackup = async () => {
+    setError(null);
+    setSuccess(null);
     try {
       const backup = await invoke<{ vaultFile: unknown }>("export_vault");
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -506,12 +527,15 @@ function App() {
       link.download = `veryfied-vault-backup-${Date.now()}.json`;
       link.click();
       URL.revokeObjectURL(url);
+      setSuccess("Backup exported successfully.");
     } catch (err) {
       setError(String(err));
     }
   };
 
   const handleImportBackup = async (file: File) => {
+    setError(null);
+    setSuccess(null);
     try {
       const raw = await file.text();
       const backup = JSON.parse(raw) as { vaultFile?: unknown };
@@ -520,14 +544,13 @@ function App() {
       setIsAddModalOpen(false);
       setAddLabel("");
       setAddWebsite("");
-      setAddTagsText("");
       setAddRows([createAddAccountRow()]);
       setEditingEntryId(null);
       setNewEntry(EMPTY_ENTRY);
-      setEntryTagsText("");
       setRevealId(null);
       setRevealedPassword(null);
       setMode("locked");
+      setSuccess("Vault imported. Please unlock with the backup's master password.");
     } catch (err) {
       setError(String(err));
     }
@@ -591,62 +614,181 @@ function App() {
 
   if (mode !== "unlocked") {
     return (
-      <StarsBackground className="min-h-screen text-white">
-        <div className="flex min-h-screen items-center justify-center px-4 text-white">
-          <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
-            <CardContent className="space-y-6 px-8 py-10">
-              <div className="flex flex-col items-center gap-5 text-center">
-                <img src={arxLogo} alt="ARX" className="h-28 w-28 object-contain" />
-                <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">ARX</CardTitle>
-              </div>
-
-              {error && (
-                <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white">
-                  <p className="font-medium">Action failed</p>
-                  <p className="mt-1 text-white/75">{error}</p>
+      <>
+        <StarsBackground className="min-h-screen text-white">
+          <div className="flex min-h-screen items-center justify-center px-4 text-white">
+            <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+              <CardContent className="space-y-6 px-8 py-10">
+                <div className="flex flex-col items-center gap-5 text-center">
+                  <img src={arxLogo} alt="ARX" className="h-28 w-28 object-contain" />
+                  <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">ARX</CardTitle>
                 </div>
-              )}
 
+                {error && (
+                  <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white">
+                    <p className="font-medium">Action failed</p>
+                    <p className="mt-1 text-white/75">{error}</p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="unlock-password" className="text-sm text-white/80">
+                      {mode === "setup" ? "New master password" : "Master password"}
+                    </Label>
+                    <Input
+                      id="unlock-password"
+                      type="password"
+                      value={masterPassword}
+                      onChange={(event) => setMasterPassword(event.target.value)}
+                      placeholder={mode === "setup" ? "Create master password" : "Enter master password"}
+                      className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
+                    />
+                  </div>
+
+                  {mode === "setup" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="setup-hint" className="text-sm text-white/80">
+                        Password hint (optional)
+                      </Label>
+                      <Input
+                        id="setup-hint"
+                        value={masterPasswordHint}
+                        onChange={(event) => setMasterPasswordHint(event.target.value)}
+                        placeholder="e.g. My childhood pet's name"
+                        className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {isRecovering ? (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                      <div className="space-y-2">
+                        <Label htmlFor="recovery-key" className="text-sm text-white/80">
+                          Emergency Recovery Key
+                        </Label>
+                        <Input
+                          id="recovery-key"
+                          value={recoveryInput}
+                          onChange={(e) => setRecoveryInput(e.target.value)}
+                          placeholder="XXXX-XXXX-XXXX-XXXX"
+                          className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20 font-mono uppercase"
+                        />
+                        <p className="text-[10px] text-white/40 uppercase tracking-widest text-center px-4 leading-relaxed">
+                          Enter your emergency key to restore access without your password.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleRecoverVault}
+                        disabled={isBusy || !recoveryInput}
+                        className="h-12 w-full rounded-2xl bg-white text-sm font-semibold text-black hover:bg-white/90"
+                      >
+                        Restore Access
+                      </Button>
+                      <button
+                        onClick={() => setIsRecovering(false)}
+                        className="w-full text-xs text-white/45 hover:text-white transition-colors"
+                      >
+                        Back to Login
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Button
+                        onClick={mode === "setup" ? handleInitVault : handleUnlock}
+                        disabled={isBusy}
+                        size="lg"
+                        className="h-12 w-full rounded-2xl border border-white bg-white text-sm font-semibold text-black shadow-none hover:bg-white/90"
+                      >
+                        {mode === "setup" ? "Create vault" : "Unlock vault"}
+                      </Button>
+
+                      {mode !== "setup" && (
+                        <div className="text-center space-y-4">
+                          <div className="flex flex-col gap-2">
+                            {vaultHint && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowHint(!showHint)}
+                                  className="text-xs text-white/45 hover:text-white transition-colors"
+                                >
+                                  View password hint
+                                </button>
+                                {showHint && (
+                                  <p className="mt-1 text-sm text-white/70 italic bg-white/5 p-3 rounded-xl border border-white/10 animate-in fade-in slide-in-from-top-1 duration-300">
+                                    Hint: {vaultHint}
+                                  </p>
+                                )}
+                              </>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setIsRecovering(true)}
+                              className="text-xs text-white/45 hover:text-white transition-colors"
+                            >
+                              Lost password? Use Recovery Key
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </StarsBackground>
+
+        {isRecoveryKeyModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="unlock-password" className="text-sm text-white/80">
-                  Master password
-                </Label>
-                <Input
-                  id="unlock-password"
-                  type="password"
-                  value={masterPassword}
-                  onChange={(event) => setMasterPassword(event.target.value)}
-                  placeholder={mode === "setup" ? "Create master password" : "Enter master password"}
-                  className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
-                />
+                <h3 className="text-xl font-semibold text-white">Your Emergency Recovery Key</h3>
+                <p className="text-sm text-white/60">
+                  If you ever lose your master password, this is the <span className="text-white font-bold">ONLY WAY</span> to recover your data.
+                </p>
               </div>
 
-              <Button
-                onClick={mode === "setup" ? handleInitVault : handleUnlock}
-                disabled={isBusy}
-                size="lg"
-                className="h-12 w-full rounded-2xl border border-white bg-white text-sm font-semibold text-black shadow-none hover:bg-white/90"
-              >
-                {mode === "setup" ? "Create vault" : "Unlock vault"}
-              </Button>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center space-y-4">
+                <div 
+                  className="p-4 bg-black/40 rounded-xl border border-white/20 font-mono text-xl tracking-wider select-all cursor-pointer hover:bg-black/60 transition-colors text-white"
+                  onClick={() => {
+                    if (recoveryKey) {
+                      navigator.clipboard.writeText(recoveryKey);
+                      setSuccess("Recovery key copied to clipboard!");
+                    }
+                  }}
+                >
+                  {recoveryKey}
+                </div>
+                <p className="text-[10px] uppercase tracking-widest text-white/30">
+                  Click the key to copy. Save it somewhere secure.
+                </p>
+              </div>
+              
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/70">
+                <ShieldCheck className="size-5 shrink-0 text-white/40" />
+                <p>Store this key in a physical safe, a printed document, or a separate secure location. Without it, your passwords are unrecoverable if you forget your password.</p>
+              </div>
 
-              <Button
-                variant="outline"
-                onClick={handleResetVault}
-                disabled={isBusy}
-                className="h-11 w-full rounded-2xl border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              <Button 
+                className="w-full h-12 rounded-2xl bg-white text-black font-semibold hover:bg-white/90"
+                onClick={() => setIsRecoveryKeyModalOpen(false)}
               >
-                Reset vault on this device
+                I have saved my recovery key
               </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </StarsBackground>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,rgba(78,222,163,0.12),transparent_24%),radial-gradient(circle_at_85%_8%,rgba(192,193,255,0.10),transparent_20%),radial-gradient(circle_at_75%_85%,rgba(17,94,106,0.24),transparent_24%),linear-gradient(180deg,#0b0f10_0%,#101415_55%,#0b0f10_100%)] text-foreground">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.05),transparent_24%),radial-gradient(circle_at_85%_8%,rgba(255,255,255,0.05),transparent_20%),radial-gradient(circle_at_75%_85%,rgba(255,255,255,0.08),transparent_24%),linear-gradient(180deg,#0b0f10_0%,#101415_55%,#0b0f10_100%)] text-foreground">
       <div className="mx-auto grid min-h-screen max-w-400 lg:grid-cols-[260px_1fr]">
         <aside className="border-r border-white/10 bg-black/20 px-4 py-5 backdrop-blur-2xl">
           <div className="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
@@ -736,94 +878,93 @@ function App() {
               </Alert>
             )}
 
+            {success && (
+              <Alert className="border-white/10 bg-white/5 text-white">
+                <ShieldCheck className="size-4 text-white" />
+                <AlertTitle className="text-white">Success</AlertTitle>
+                <AlertDescription className="text-white/75">{success}</AlertDescription>
+              </Alert>
+            )}
+
             <section className="space-y-3">
               <h1 className="text-4xl font-semibold tracking-tight text-balance text-white sm:text-5xl">
                 {activeSectionTitle}
               </h1>
-              <p className="max-w-2xl text-base leading-7 text-white/70">
-                {activeSectionSummary}
-              </p>
             </section>
 
             {activeSection === "overview" && (
               <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
-              <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-xl text-white">Vault Health</CardTitle>
-                      <CardDescription className="text-white/60">
-                        {totalItems === 0
-                          ? "No entries yet. Start by adding one."
-                          : `${totalItems} encrypted entries stored locally.`}
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleRunAudit}
-                      className="rounded-full border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
-                    >
-                      Run Audit
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-5 px-6 py-6">
-                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-5">
-                    <div className="flex items-center justify-between gap-4 text-sm text-white/60">
-                      <span>Vault score</span>
-                      <span>{vaultHealth}%</span>
-                    </div>
-                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className={`vault-progress-${progressBucket} h-full rounded-full bg-linear-to-r from-white to-zinc-400 shadow-[0_0_24px_rgba(255,255,255,0.18)]`}
-                      />
-                    </div>
-                    <p className="mt-4 text-sm leading-7 text-white/70">
-                      92% security score. Local encrypted storage active.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {[
-                      { label: "Encrypted", value: "AES-GCM" },
-                      { label: "Sync", value: "Off" },
-                      { label: "State", value: isBusy ? "Busy" : "Ready" },
-                    ].map((item) => (
-                      <div
-                        key={item.label}
-                        className="rounded-[22px] border border-white/10 bg-black/20 p-4"
+                <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                  <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-xl text-white">Vault Health</CardTitle>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={handleRunAudit}
+                        className="rounded-full border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
                       >
-                        <p className="text-xs uppercase tracking-[0.22em] text-white/45">{item.label}</p>
-                        <p className="mt-2 text-base font-medium text-white">{item.value}</p>
+                        Run Audit
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-5 px-6 py-6">
+                    <div className="rounded-[22px] border border-white/10 bg-black/20 p-5">
+                      <div className="flex items-center justify-between gap-4 text-sm text-white/60">
+                        <span>Vault score</span>
+                        <span>{vaultHealth}%</span>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className={`vault-progress-${progressBucket} h-full rounded-full bg-linear-to-r from-white to-zinc-400 shadow-[0_0_24px_rgba(255,255,255,0.18)]`}
+                        />
+                      </div>
+                      <p className="mt-4 text-sm leading-7 text-white/70">
+                        Local encrypted storage active.
+                      </p>
+                    </div>
 
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-1">
-                <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                  <CardContent className="space-y-2 px-6 py-6">
-                    <p className="text-xs uppercase tracking-[0.22em] text-white/45">Total items</p>
-                    <p className="text-5xl font-semibold tracking-tight text-white">{totalItems}</p>
-                    <p className="text-sm text-white/65">Stored in the local encrypted vault.</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                  <CardContent className="space-y-3 px-6 py-6">
-                    <p className="text-xs uppercase tracking-[0.22em] text-white/45">Recent activity</p>
-                    <div className="space-y-3">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
-                        {totalItems > 0 ? `${totalItems} entries available.` : "Awaiting first vault item."}
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
-                        No cloud sync. No plaintext secrets.
-                      </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {[
+                        { label: "Encrypted", value: "AES-GCM" },
+                        { label: "Sync", value: "Off" },
+                        { label: "State", value: isBusy ? "Busy" : "Ready" },
+                      ].map((item) => (
+                        <div
+                          key={item.label}
+                          className="rounded-[22px] border border-white/10 bg-black/20 p-4"
+                        >
+                          <p className="text-xs uppercase tracking-[0.22em] text-white/45">{item.label}</p>
+                          <p className="mt-2 text-base font-medium text-white">{item.value}</p>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
-              </div>
+
+                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-1">
+                  <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                    <CardContent className="space-y-2 px-6 py-6">
+                      <p className="text-xs uppercase tracking-[0.22em] text-white/45">Total items</p>
+                      <p className="text-5xl font-semibold tracking-tight text-white">{totalItems}</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                    <CardContent className="space-y-3 px-6 py-6">
+                      <p className="text-xs uppercase tracking-[0.22em] text-white/45">Recent activity</p>
+                      <div className="space-y-3">
+                        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
+                          {totalItems > 0 ? `${totalItems} entries available.` : "Awaiting first vault item."}
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
+                          No cloud sync. No plaintext secrets.
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </section>
             )}
 
@@ -849,6 +990,7 @@ function App() {
                 onSettingsChange={handleSettingsChange}
                 onExportBackup={handleExportBackup}
                 onImportBackup={handleImportBackup}
+                onResetVault={openResetConfirm}
               />
             )}
           </div>
@@ -870,11 +1012,6 @@ function App() {
                   <CardTitle className="text-xl text-white">
                     {editingEntryId ? "Edit Entry" : "Login Details"}
                   </CardTitle>
-                  <CardDescription className="text-white/60">
-                    {editingEntryId
-                      ? "Update the stored password entry without leaving the page."
-                      : "Set one shared label and website, then add one or more username/password rows."}
-                  </CardDescription>
                 </div>
                 <Button
                   variant="ghost"
@@ -886,97 +1023,47 @@ function App() {
               </div>
             </CardHeader>
             <CardContent className="flex-1 space-y-4 overflow-y-auto px-6 py-6 pr-3">
-              <div className="flex items-center justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setNewEntry((current) => ({ ...current, password: generatePassword() }))}
-                  className="h-10 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-                >
-                  <Sparkles className="mr-2 size-4" />
-                  Generate password
-                </Button>
-              </div>
               {editingEntryId ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="entry-label-modal" className="text-white/80">
-                      Label
-                    </Label>
+                    <Label htmlFor="entry-label-modal" className="text-white/80">Label</Label>
                     <Input
                       id="entry-label-modal"
                       value={newEntry.label}
-                      onChange={(event) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          label: event.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNewEntry(prev => ({ ...prev, label: e.target.value }))}
                       placeholder="e.g. Dribbble"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="entry-username-modal" className="text-white/80">
-                      Username
-                    </Label>
+                    <Label htmlFor="entry-username-modal" className="text-white/80">Username</Label>
                     <Input
                       id="entry-username-modal"
                       value={newEntry.username}
-                      onChange={(event) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          username: event.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNewEntry(prev => ({ ...prev, username: e.target.value }))}
                       placeholder="alex@example.com"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="entry-password-modal" className="text-white/80">
-                      Password
-                    </Label>
+                    <Label htmlFor="entry-password-modal" className="text-white/80">Password</Label>
                     <Input
                       id="entry-password-modal"
                       type="password"
                       value={newEntry.password}
-                      onChange={(event) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          password: event.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNewEntry(prev => ({ ...prev, password: e.target.value }))}
                       placeholder="Minimum 8 characters"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="entry-url-modal" className="text-white/80">
-                      Website
-                    </Label>
+                    <Label htmlFor="entry-url-modal" className="text-white/80">Website</Label>
                     <Input
                       id="entry-url-modal"
                       value={newEntry.url}
-                      onChange={(event) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          url: event.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNewEntry(prev => ({ ...prev, url: e.target.value }))}
                       placeholder="https://"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="entry-tags-modal" className="text-white/80">
-                      Tags
-                    </Label>
-                    <Input
-                      id="entry-tags-modal"
-                      value={entryTagsText}
-                      onChange={(event) => setEntryTagsText(event.target.value)}
-                      placeholder="work, finance, shared"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                     />
                   </div>
                 </div>
@@ -984,52 +1071,34 @@ function App() {
                 <div className="space-y-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="entry-label-modal" className="text-white/80">
-                        Label
-                      </Label>
+                      <Label htmlFor="entry-label-modal" className="text-white/80">Label</Label>
                       <Input
                         id="entry-label-modal"
                         value={addLabel}
-                        onChange={(event) => setAddLabel(event.target.value)}
+                        onChange={(e) => setAddLabel(e.target.value)}
                         placeholder="e.g. Gmail"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="entry-url-modal" className="text-white/80">
-                        Website
-                      </Label>
+                      <Label htmlFor="entry-url-modal" className="text-white/80">Website</Label>
                       <Input
                         id="entry-url-modal"
                         value={addWebsite}
-                        onChange={(event) => setAddWebsite(event.target.value)}
+                        onChange={(e) => setAddWebsite(e.target.value)}
                         placeholder="https://mail.google.com"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
-                      />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="entry-tags-modal" className="text-white/80">
-                        Tags
-                      </Label>
-                      <Input
-                        id="entry-tags-modal"
-                        value={addTagsText}
-                        onChange={(event) => setAddTagsText(event.target.value)}
-                        placeholder="gmail, work, personal"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-3 rounded-[22px] border border-white/10 bg-black/20 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-white">Account rows</p>
-                        <p className="text-xs text-white/55">Add one row per login. Each row becomes a separate saved entry.</p>
-                      </div>
+                      <p className="text-sm font-medium text-white">Account rows</p>
                       <Button
                         variant="outline"
-                        onClick={() => setAddRows((current) => [...current, createAddAccountRow()])}
+                        size="sm"
+                        onClick={() => setAddRows(current => [...current, createAddAccountRow()])}
                         className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
                       >
                         <Plus className="mr-2 size-4" />
@@ -1047,15 +1116,9 @@ function App() {
                             <Input
                               id={`row-username-${row.id}`}
                               value={row.username}
-                              onChange={(event) =>
-                                setAddRows((current) =>
-                                  current.map((item) =>
-                                    item.id === row.id ? { ...item, username: event.target.value } : item,
-                                  ),
-                                )
-                              }
+                              onChange={(e) => setAddRows(current => current.map(item => item.id === row.id ? { ...item, username: e.target.value } : item))}
                               placeholder="john@gmail.com"
-                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                             />
                           </div>
                           <div className="space-y-2">
@@ -1066,24 +1129,14 @@ function App() {
                               id={`row-password-${row.id}`}
                               type="password"
                               value={row.password}
-                              onChange={(event) =>
-                                setAddRows((current) =>
-                                  current.map((item) =>
-                                    item.id === row.id ? { ...item, password: event.target.value } : item,
-                                  ),
-                                )
-                              }
+                              onChange={(e) => setAddRows(current => current.map(item => item.id === row.id ? { ...item, password: e.target.value } : item))}
                               placeholder="Minimum 8 characters"
-                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                             />
                           </div>
                           <Button
                             variant="outline"
-                            onClick={() =>
-                              setAddRows((current) =>
-                                current.length === 1 ? current : current.filter((item) => item.id !== row.id),
-                              )
-                            }
+                            onClick={() => setAddRows(current => current.length === 1 ? current : current.filter(item => item.id !== row.id))}
                             disabled={addRows.length === 1}
                             className="h-11 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 disabled:opacity-50"
                           >
@@ -1102,6 +1155,44 @@ function App() {
               >
                 {editingEntryId ? "Update entry" : "Save entries"}
               </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isResetConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="Close reset confirmation dialog"
+            onClick={closeResetConfirm}
+          />
+          <Card className="relative z-10 w-full max-w-md rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)]">
+            <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
+              <CardTitle className="text-xl text-white">Reset vault?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 px-6 py-6">
+              <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+                This cannot be undone.
+              </div>
+              <div className="flex gap-3 sm:justify-end">
+                <Button
+                  variant="outline"
+                  onClick={closeResetConfirm}
+                  disabled={isBusy}
+                  className="h-11 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmResetVault}
+                  disabled={isBusy}
+                  className="h-11 rounded-2xl bg-white text-slate-950 hover:bg-white/90"
+                >
+                  Reset vault
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

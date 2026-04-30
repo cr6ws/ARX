@@ -1,6 +1,7 @@
 export type VaultStatus = {
   hasVault: boolean;
   isUnlocked: boolean;
+  hint?: string | null;
 };
 
 export type VaultEntrySummary = {

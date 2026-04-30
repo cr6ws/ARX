@@ -23,7 +23,14 @@ pub fn read_vault_file(path: &Path) -> Result<VaultFile, String> {
 pub fn delete_vault_file() -> Result<(), String> {
     let path = vault_path()?;
     if path.exists() {
-        fs::remove_file(path).map_err(|e| e.to_string())?;
+        fs::remove_file(&path).map_err(|e| format!("Failed to delete vault file: {}", e))?;
+    }
+    
+    // Also try to clear the parent directory just in case
+    if let Some(parent) = path.parent() {
+        if parent.exists() {
+            let _ = fs::remove_dir_all(parent);
+        }
     }
     Ok(())
 }

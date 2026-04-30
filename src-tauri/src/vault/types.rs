@@ -66,8 +66,15 @@ impl VaultData {
 pub struct VaultFile {
     pub version: u8,
     pub salt_b64: String,
+    pub wrapped_key_b64: String, // Master key wrapped by password
     pub nonce_b64: String,
-    pub ciphertext_b64: String,
+    pub ciphertext_b64: String,  // Vault data wrapped by master key
+    pub data_nonce_b64: String,
+    pub hint_b64: Option<String>,
+    // Recovery
+    pub recovery_salt_b64: String,
+    pub recovery_wrapped_key_b64: String,
+    pub recovery_nonce_b64: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -81,6 +88,7 @@ pub struct VaultBackup {
 pub struct VaultStatus {
     pub has_vault: bool,
     pub is_unlocked: bool,
+    pub hint: Option<String>,
 }
 
 pub struct VaultSession {
@@ -89,6 +97,7 @@ pub struct VaultSession {
     pub salt: Option<Vec<u8>>,
     pub vault_data: VaultData,
     pub vault_path: Option<PathBuf>,
+    pub hint: Option<String>,
 }
 
 impl VaultSession {
@@ -99,6 +108,7 @@ impl VaultSession {
             salt: None,
             vault_data: VaultData::empty(),
             vault_path: None,
+            hint: None,
         }
     }
 
@@ -111,5 +121,6 @@ impl VaultSession {
         self.vault_data = VaultData::empty();
         self.vault_path = None;
         self.unlocked = false;
+        self.hint = None;
     }
 }

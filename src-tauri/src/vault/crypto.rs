@@ -46,3 +46,27 @@ pub fn decrypt_vault(key: &[u8], nonce: &[u8], ciphertext: &[u8]) -> Result<Vaul
         .map_err(|_| "Invalid password or corrupted vault.".to_string())?;
     serde_json::from_slice(&plaintext).map_err(|_| "Failed to parse vault.".to_string())
 }
+
+pub fn generate_master_key() -> [u8; 32] {
+    let mut key = [0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut key);
+    key
+}
+
+pub fn encrypt_key(wrapper_key: &[u8], target_key: &[u8]) -> Result<(Vec<u8>, [u8; 12]), String> {
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(wrapper_key));
+    let mut nonce = [0u8; 12];
+    rand::rngs::OsRng.fill_bytes(&mut nonce);
+    let ciphertext = cipher
+        .encrypt(Nonce::from_slice(&nonce), target_key)
+        .map_err(|_| "Key wrapping failed.".to_string())?;
+    Ok((ciphertext, nonce))
+}
+
+pub fn decrypt_key(wrapper_key: &[u8], nonce: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(wrapper_key));
+    let target_key = cipher
+        .decrypt(Nonce::from_slice(nonce), ciphertext)
+        .map_err(|_| "Invalid key or recovery code.".to_string())?;
+    Ok(target_key)
+}

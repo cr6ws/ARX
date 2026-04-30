@@ -106,9 +106,6 @@ export function PasswordsPage({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <CardTitle className="text-xl text-white">Passwords</CardTitle>
-              <CardDescription className="text-white/60">
-                Full CRUD table for the stored vault entries.
-              </CardDescription>
             </div>
             <Button onClick={onAddItem} className="h-11 rounded-full bg-white text-slate-950 hover:bg-white/90">
               <Plus className="mr-2 size-4" />
@@ -119,7 +116,7 @@ export function PasswordsPage({
         <CardContent className="px-0 py-0">
           {entries.length === 0 ? (
             <div className="px-6 py-8 text-sm text-white/60">
-              No saved passwords yet. Use Add Item to create your first entry.
+              No saved passwords yet.
             </div>
           ) : (
             <div className="overflow-hidden">
@@ -146,15 +143,24 @@ export function PasswordsPage({
                       <div className="min-w-0 text-center">
                         <p className="truncate text-[13px] font-semibold text-white sm:text-sm">{entry.label}</p>
                       </div>
-                      <p className="truncate text-[13px] text-white/70 sm:text-sm">{entry.username}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(entry.username);
+                        }}
+                        className="truncate text-[13px] text-white/70 hover:text-white transition-colors sm:text-sm text-center"
+                        title="Click to copy username"
+                      >
+                        {entry.username}
+                      </button>
                       <p className="text-[13px] text-white/70 sm:text-sm">{new Date(entry.updatedAt * 1000).toLocaleDateString()}</p>
                       <div className="flex items-center justify-center gap-1.5">
                         <Button
                           variant="outline"
                           onClick={() => onReveal(entry.id)}
                           disabled={isBusy}
-                          className="h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-                          aria-label={`Reveal password for ${entry.label}`}
+                          className={`h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10 ${revealedEntryId === entry.id ? "bg-white text-black hover:bg-white/90 border-white" : ""}`}
+                          aria-label={revealedEntryId === entry.id ? "Hide password" : `Reveal password for ${entry.label}`}
                         >
                           <Eye className="size-3.5" />
                         </Button>
