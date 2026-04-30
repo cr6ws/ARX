@@ -133,6 +133,7 @@ function App() {
   const [auditRunId, setAuditRunId] = useState(0);
   const [isAddModalMounted, setIsAddModalMounted] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [manualOrder, setManualOrder] = useState<string[]>([]);
   const clipboardTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -141,14 +142,27 @@ function App() {
 
   const filteredEntries = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    if (!query) return entries;
-    return entries.filter((entry) => {
+    let base = entries;
+    
+    // Apply manual order if it exists
+    if (manualOrder.length > 0) {
+      const orderMap = new Map(manualOrder.map((id, index) => [id, index]));
+      base = [...entries].sort((a, b) => {
+        const posA = orderMap.has(a.id) ? (orderMap.get(a.id) ?? 9999) : 9999;
+        const posB = orderMap.has(b.id) ? (orderMap.get(b.id) ?? 9999) : 9999;
+        if (posA !== posB) return posA - posB;
+        return b.updatedAt - a.updatedAt;
+      });
+    }
+
+    if (!query) return base;
+    return base.filter((entry) => {
       const haystack = [entry.label, entry.username, entry.url ?? ""]
         .join(" ")
         .toLowerCase();
       return haystack.includes(query);
     });
-  }, [entries, searchTerm]);
+  }, [entries, searchTerm, manualOrder]);
 
   const highlightedEntryId = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -216,7 +230,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("veryfied-settings");
+    const stored = window.localStorage.getItem("arx-settings");
     if (!stored) return;
     try {
       const parsed = JSON.parse(stored) as Partial<VaultSettings>;
@@ -228,7 +242,18 @@ function App() {
         setActiveSection(parsed.defaultSection);
       }
     } catch {
-      window.localStorage.removeItem("veryfied-settings");
+      window.localStorage.removeItem("arx-settings");
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedOrder = window.localStorage.getItem("arx-entry-order");
+    if (storedOrder) {
+      try {
+        setManualOrder(JSON.parse(storedOrder) as string[]);
+      } catch {
+        window.localStorage.removeItem("arx-entry-order");
+      }
     }
   }, []);
 
@@ -373,18 +398,23 @@ function App() {
   };
 
   const handleSaveEntry = async () => {
-    if (!addLabel.trim()) {
+    const labelToValidate = editingEntryId ? newEntry.label : addLabel;
+    if (!labelToValidate.trim()) {
       setError("Label is required.");
       return;
     }
 
-    const validRows = addRows.filter(
-      (row) => row.username.trim() && row.password.length >= 8,
-    );
+    if (!editingEntryId) {
+      const validRows = addRows.filter(
+        (row) => row.username.trim() && row.password.length >= 8,
+      );
 
-    if (validRows.length === 0) {
-      setError("Add at least one username and password row.");
-      return;
+      if (validRows.length === 0) {
+        setError("Add at least one username and password row.");
+        return;
+      }
+      
+      // We will use validRows below in the else block
     }
 
     setIsBusy(true);
@@ -402,6 +432,9 @@ function App() {
         };
         await invoke("update_password", { id: editingEntryId, entry: payload });
       } else {
+        const validRows = addRows.filter(
+          (row) => row.username.trim() && row.password.length >= 8,
+        );
         for (const row of validRows) {
           await invoke("add_password", {
             entry: {
@@ -542,6 +575,12 @@ function App() {
     } finally {
       setIsBusy(false);
     }
+  };
+
+  const handleReorder = (newEntries: VaultEntrySummary[]) => {
+    const newOrder = newEntries.map((e) => e.id);
+    setManualOrder(newOrder);
+    window.localStorage.setItem("arx-entry-order", JSON.stringify(newOrder));
   };
 
   const handleSettingsChange = (nextSettings: VaultSettings) => {
@@ -1134,6 +1173,7 @@ function App() {
                 revealedEntryId={revealId}
                 revealedPassword={revealedPassword}
                 compactRows={settings.compactRows}
+                onReorder={handleReorder}
                 highlightedEntryId={highlightedEntryId}
               />
             )}

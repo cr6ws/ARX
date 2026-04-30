@@ -27,8 +27,8 @@ type SecurityAuditPageProps = {
   auditRunId: number;
 };
 
-const HISTORY_KEY = "veryfied-audit-history";
-const IGNORED_KEY = "veryfied-audit-ignored";
+const HISTORY_KEY = "arx-audit-history";
+const IGNORED_KEY = "arx-audit-ignored";
 
 function getAgeDays(updatedAt: number) {
   const ageMs = Date.now() - updatedAt * 1000;
@@ -146,7 +146,7 @@ export function SecurityAuditPage({ entries, auditRunId: _auditRunId }: Security
         window.clearInterval(interval);
         
         // Finalize
-        const nextHistory = [report, ...history].slice(0, 3);
+        const nextHistory = [report, ...history].slice(0, 50);
         setHistory(nextHistory);
         window.localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
         setIsRunning(false);
@@ -180,7 +180,7 @@ export function SecurityAuditPage({ entries, auditRunId: _auditRunId }: Security
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `veryfied-audit-${Date.now()}.json`;
+    link.download = `arx-audit-${Date.now()}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -251,7 +251,7 @@ export function SecurityAuditPage({ entries, auditRunId: _auditRunId }: Security
                   No obvious audit issues were found.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-2 custom-scrollbar">
                   {report.issues.map((issue, index) => (
                     <div
                       key={`${issue.title}-${issue.label}-${index}`}
@@ -297,9 +297,9 @@ export function SecurityAuditPage({ entries, auditRunId: _auditRunId }: Security
               </div>
             </CardHeader>
             <CardContent className="px-6 py-6">
-              <div className="space-y-6 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-white/10">
+              <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-white/10 max-h-[440px] overflow-y-auto pr-2 custom-scrollbar">
                 {history.map((entry) => (
-                  <div key={entry.generatedAt} className="relative pl-8 group">
+                  <div key={entry.generatedAt} className="relative pl-8 group flex-shrink-0">
                     <div className="absolute left-1.5 top-1.5 size-3 rounded-full bg-white border-4 border-zinc-950" />
                     <div className="flex items-start justify-between">
                       <div className="space-y-2 flex-1">

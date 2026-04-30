@@ -9,7 +9,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import type { SidebarSection, VaultSettings } from "../types/vault";
 
-const STORAGE_KEY = "veryfied-settings";
+const STORAGE_KEY = "arx-settings";
 
 type SettingsPageProps = {
   settings: VaultSettings;

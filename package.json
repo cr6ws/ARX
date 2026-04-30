@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "powershell -Command \"if (Test-Path $env:APPDATA\\arx) { Remove-Item -Recurse -Force $env:APPDATA\\arx } if (Test-Path $env:APPDATA\\veryfied) { Remove-Item -Recurse -Force $env:APPDATA\\veryfied }\"",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri"

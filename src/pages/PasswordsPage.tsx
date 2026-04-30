@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardCopy, Eye, PencilLine, Plus, Trash2, Star, User, Briefcase, Share2, Wallet, Shield } from "lucide-react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ClipboardCopy, Eye, PencilLine, Plus, Trash2, Star, User, Briefcase, Share2, Wallet, Shield, GripVertical } from "lucide-react";
+import { Reorder, useDragControls, AnimatePresence } from "motion/react";
 
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -17,6 +18,7 @@ type PasswordsPageProps = {
   revealedPassword: string | null;
   compactRows: boolean;
   highlightedEntryId: string | null;
+  onReorder: (newEntries: VaultEntrySummary[]) => void;
 };
 
 function getEntryHost(entry: VaultEntrySummary) {
@@ -70,6 +72,133 @@ function EntryLogo({ entry }: { entry: VaultEntrySummary }) {
     </div>
   );
 }
+const EntryRow = memo(({ 
+  entry, 
+  rowClassName, 
+  pulseEntryId, 
+  revealedEntryId, 
+  revealedPassword, 
+  onReveal, 
+  onEditItem, 
+  onDelete, 
+  onCopyPassword,
+  isBusy,
+  rowRefs
+}: { 
+  entry: VaultEntrySummary; 
+  rowClassName: string;
+  pulseEntryId: string | null;
+  revealedEntryId: string | null;
+  revealedPassword: string | null;
+  onReveal: (id: string) => void;
+  onEditItem: (id: string) => void;
+  onDelete: (id: string) => void;
+  onCopyPassword: (password: string) => void;
+  isBusy: boolean;
+  rowRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
+}) => {
+  const controls = useDragControls();
+  const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
+
+  return (
+    <Reorder.Item
+      value={entry}
+      dragListener={false}
+      dragControls={controls}
+      key={entry.id}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      ref={(node: any) => {
+        if (node) rowRefs.current[entry.id] = node as unknown as HTMLDivElement;
+      }}
+      className={`px-6 py-3 transition-colors duration-200 hover:bg-white/[0.02] cursor-default border-b border-white/5 last:border-0 ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""} ${entry.isFavorite ? "bg-white/[0.03]" : ""}`}
+    >
+      <div className={rowClassName}>
+        <div 
+          className="flex items-center justify-center text-white/20 hover:text-white/50 cursor-grab active:cursor-grabbing p-2 -m-2 touch-none"
+          onPointerDown={(e) => controls.start(e)}
+        >
+          <GripVertical className="size-4" />
+        </div>
+        <div className="flex items-center justify-center relative">
+          <EntryLogo entry={entry} />
+          {entry.isFavorite && (
+            <div className="absolute -top-1 -right-1 size-5 bg-yellow-500 rounded-full flex items-center justify-center border-2 border-[#151a1c] shadow-lg">
+              <Star className="size-2.5 text-black fill-current" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 text-center flex flex-col items-center gap-1">
+          <p className="truncate text-[13px] font-semibold text-white sm:text-sm">{entry.label}</p>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
+            <CategoryIcon className="size-3 text-white/40" />
+            <span className="text-[9px] uppercase tracking-wider text-white/40 font-medium">{entry.category}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText(entry.username);
+          }}
+          className="truncate text-[13px] text-white/70 hover:text-white transition-colors sm:text-sm text-center"
+          title="Click to copy username"
+        >
+          {entry.username}
+        </button>
+        <p className="text-[13px] text-white/70 sm:text-sm">{new Date(entry.updatedAt * 1000).toLocaleDateString()}</p>
+        <div className="flex items-center justify-center gap-1.5">
+          <Button
+            variant="outline"
+            onClick={() => onReveal(entry.id)}
+            disabled={isBusy}
+            className={`h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10 ${revealedEntryId === entry.id ? "bg-white text-black hover:bg-white/90 border-white" : ""}`}
+            aria-label={revealedEntryId === entry.id ? "Hide password" : `Reveal password for ${entry.label}`}
+          >
+            <Eye className="size-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onEditItem(entry.id)}
+            disabled={isBusy}
+            className="h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+            aria-label={`Edit ${entry.label}`}
+          >
+            <PencilLine className="size-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onDelete(entry.id)}
+            disabled={isBusy}
+            className="h-8 w-8 rounded-full border-white/20 bg-white/10 p-0 text-white hover:bg-white/15"
+            aria-label={`Delete ${entry.label}`}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {revealedEntryId === entry.id && revealedPassword && (
+        <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">Revealed password</p>
+              <p className="mt-2 break-all font-mono text-sm text-white">{revealedPassword}</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => onCopyPassword(revealedPassword)}
+              className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+            >
+              <ClipboardCopy className="mr-2 size-4" />
+              Copy
+            </Button>
+          </div>
+        </div>
+      )}
+    </Reorder.Item>
+  );
+});
 
 export function PasswordsPage({
   entries,
@@ -83,12 +212,21 @@ export function PasswordsPage({
   revealedPassword,
   compactRows,
   highlightedEntryId,
+  onReorder,
 }: PasswordsPageProps) {
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [pulseEntryId, setPulseEntryId] = useState<string | null>(null);
+  
+  // Local state for immediate drag feedback
+  const [localEntries, setLocalEntries] = useState(entries);
+
+  useEffect(() => {
+    setLocalEntries(entries);
+  }, [entries]);
+
   const rowClassName = compactRows
-    ? "grid grid-cols-[72px_minmax(0,1.05fr)_0.85fr_0.7fr_0.75fr] items-center gap-2 text-center text-[10px] sm:text-xs"
-    : "grid grid-cols-[76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] items-center gap-3 text-center text-[11px] sm:text-xs";
+    ? "grid grid-cols-[30px_72px_minmax(0,1.05fr)_0.85fr_0.7fr_0.75fr] items-center gap-2 text-center text-[10px] sm:text-xs"
+    : "grid grid-cols-[30px_76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] items-center gap-3 text-center text-[11px] sm:text-xs";
 
   useEffect(() => {
     if (!highlightedEntryId) return;
@@ -99,13 +237,10 @@ export function PasswordsPage({
     return () => window.clearTimeout(timer);
   }, [highlightedEntryId]);
 
-  const sortedEntries = useMemo(() => {
-    return [...entries].sort((a, b) => {
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-      return b.updatedAt - a.updatedAt;
-    });
-  }, [entries]);
+  const handleLocalReorder = (newEntries: VaultEntrySummary[]) => {
+    setLocalEntries(newEntries);
+    onReorder(newEntries);
+  };
 
   return (
     <section className="space-y-6">
@@ -128,104 +263,39 @@ export function PasswordsPage({
             </div>
           ) : (
             <div className="overflow-hidden">
-              <div className="grid grid-cols-[76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] border-b border-white/10 px-6 py-3 text-center text-[10px] uppercase tracking-[0.26em] text-white/45 sm:text-[11px]">
+              <div className="grid grid-cols-[30px_76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] border-b border-white/10 px-6 py-3 text-center text-[10px] uppercase tracking-[0.26em] text-white/45 sm:text-[11px]">
+                <span></span>
                 <span>Icon</span>
                 <span>Label</span>
                 <span>Username</span>
                 <span>Updated</span>
                 <span>Actions</span>
               </div>
-              <div className="divide-y divide-white/10">
-                {sortedEntries.map((entry) => {
-                  const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
-                  return (
-                    <div
+              <Reorder.Group 
+                axis="y" 
+                values={localEntries} 
+                onReorder={handleLocalReorder} 
+                className="divide-y divide-white/10"
+              >
+                <AnimatePresence initial={false}>
+                  {localEntries.map((entry) => (
+                    <EntryRow
                       key={entry.id}
-                      ref={(node) => {
-                        rowRefs.current[entry.id] = node;
-                      }}
-                      className={`px-6 py-3 transition duration-500 ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""} ${entry.isFavorite ? "bg-white/[0.03]" : ""}`}
-                    >
-                      <div className={rowClassName}>
-                        <div className="flex items-center justify-center relative">
-                          <EntryLogo entry={entry} />
-                          {entry.isFavorite && (
-                            <div className="absolute -top-1 -right-1 size-5 bg-yellow-500 rounded-full flex items-center justify-center border-2 border-[#151a1c] shadow-lg">
-                              <Star className="size-2.5 text-black fill-current" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 text-center flex flex-col items-center gap-1">
-                          <p className="truncate text-[13px] font-semibold text-white sm:text-sm">{entry.label}</p>
-                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
-                            <CategoryIcon className="size-3 text-white/40" />
-                            <span className="text-[9px] uppercase tracking-wider text-white/40 font-medium">{entry.category}</span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void navigator.clipboard.writeText(entry.username);
-                          }}
-                          className="truncate text-[13px] text-white/70 hover:text-white transition-colors sm:text-sm text-center"
-                          title="Click to copy username"
-                        >
-                          {entry.username}
-                        </button>
-                        <p className="text-[13px] text-white/70 sm:text-sm">{new Date(entry.updatedAt * 1000).toLocaleDateString()}</p>
-                        <div className="flex items-center justify-center gap-1.5">
-                          <Button
-                            variant="outline"
-                            onClick={() => onReveal(entry.id)}
-                            disabled={isBusy}
-                            className={`h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10 ${revealedEntryId === entry.id ? "bg-white text-black hover:bg-white/90 border-white" : ""}`}
-                            aria-label={revealedEntryId === entry.id ? "Hide password" : `Reveal password for ${entry.label}`}
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => onEditItem(entry.id)}
-                            disabled={isBusy}
-                            className="h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-                            aria-label={`Edit ${entry.label}`}
-                          >
-                            <PencilLine className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => onDelete(entry.id)}
-                            disabled={isBusy}
-                            className="h-8 w-8 rounded-full border-white/20 bg-white/10 p-0 text-white hover:bg-white/15"
-                            aria-label={`Delete ${entry.label}`}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {revealedEntryId === entry.id && revealedPassword && (
-                        <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">Revealed password</p>
-                              <p className="mt-2 break-all font-mono text-sm text-white">{revealedPassword}</p>
-                            </div>
-                            <Button
-                              variant="outline"
-                              onClick={() => onCopyPassword(revealedPassword)}
-                              className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-                            >
-                              <ClipboardCopy className="mr-2 size-4" />
-                              Copy
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      entry={entry}
+                      rowClassName={rowClassName}
+                      pulseEntryId={pulseEntryId}
+                      revealedEntryId={revealedEntryId}
+                      revealedPassword={revealedPassword}
+                      onReveal={onReveal}
+                      onEditItem={onEditItem}
+                      onDelete={onDelete}
+                      onCopyPassword={onCopyPassword}
+                      isBusy={isBusy}
+                      rowRefs={rowRefs}
+                    />
+                  ))}
+                </AnimatePresence>
+              </Reorder.Group>
             </div>
           )}
         </CardContent>

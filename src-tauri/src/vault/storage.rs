@@ -5,7 +5,7 @@ use crate::vault::types::VaultFile;
 
 pub fn vault_path() -> Result<PathBuf, String> {
     let base_dir = dirs::data_dir().ok_or("Unable to resolve data directory.")?;
-    let app_dir = base_dir.join("veryfied");
+    let app_dir = base_dir.join("arx");
     fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;
     Ok(app_dir.join("vault.json"))
 }
