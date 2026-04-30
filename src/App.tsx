@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import {
   AlertTriangle,
   KeyRound,
@@ -9,6 +11,12 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Star,
+  User,
+  Briefcase,
+  Share2,
+  Wallet,
+  Shield as ShieldIcon,
 } from "lucide-react";
 import arxLogo from "./assets/ARX.png";
 
@@ -49,6 +57,8 @@ const EMPTY_ENTRY: VaultEntryInput = {
   url: "",
   notes: "",
   tags: [],
+  category: "Other",
+  isFavorite: false,
 };
 
 const DEFAULT_SETTINGS: VaultSettings = {
@@ -57,6 +67,7 @@ const DEFAULT_SETTINGS: VaultSettings = {
   clipboardClearSeconds: 15,
   defaultSection: "overview",
   compactRows: false,
+  theme: "obsidian",
 };
 
 
@@ -118,6 +129,10 @@ function App() {
   const [isAddModalMounted, setIsAddModalMounted] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const clipboardTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", settings.theme);
+  }, [settings.theme]);
 
   const filteredEntries = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -370,6 +385,8 @@ function App() {
           password: newEntry.password,
           url: newEntry.url?.trim() ? newEntry.url.trim() : undefined,
           tags: [],
+          category: newEntry.category,
+          isFavorite: newEntry.isFavorite,
         };
         await invoke("update_password", { id: editingEntryId, entry: payload });
       } else {
@@ -381,6 +398,8 @@ function App() {
               password: row.password,
               url: addWebsite.trim() ? addWebsite.trim() : undefined,
               tags: [],
+              category: newEntry.category,
+              isFavorite: newEntry.isFavorite,
             },
           });
         }
@@ -502,6 +521,8 @@ function App() {
         url: fullEntry.url ?? "",
         notes: fullEntry.notes ?? "",
         tags: fullEntry.tags,
+        category: fullEntry.category,
+        isFavorite: fullEntry.isFavorite,
       });
       setIsAddModalOpen(true);
     } catch (err) {
@@ -520,37 +541,53 @@ function App() {
     setSuccess(null);
     try {
       const backup = await invoke<{ vaultFile: unknown }>("export_vault");
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `veryfied-vault-backup-${Date.now()}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-      setSuccess("Backup exported successfully.");
+      const content = JSON.stringify(backup, null, 2);
+
+      const filePath = await save({
+        filters: [{
+          name: 'JSON',
+          extensions: ['json']
+        }],
+        defaultPath: `arx-vault-backup-${Date.now()}.json`
+      });
+
+      if (filePath) {
+        await writeTextFile(filePath, content);
+        setSuccess("Backup exported successfully.");
+      }
     } catch (err) {
       setError(String(err));
     }
   };
 
-  const handleImportBackup = async (file: File) => {
+  const handleImportBackup = async () => {
     setError(null);
     setSuccess(null);
     try {
-      const raw = await file.text();
-      const backup = JSON.parse(raw) as { vaultFile?: unknown };
-      await invoke("import_vault", { backup });
-      setEntries([]);
-      setIsAddModalOpen(false);
-      setAddLabel("");
-      setAddWebsite("");
-      setAddRows([createAddAccountRow()]);
-      setEditingEntryId(null);
-      setNewEntry(EMPTY_ENTRY);
-      setRevealId(null);
-      setRevealedPassword(null);
-      setMode("locked");
-      setSuccess("Vault imported. Please unlock with the backup's master password.");
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'JSON',
+          extensions: ['json']
+        }]
+      });
+
+      if (selected && !Array.isArray(selected)) {
+        const raw = await readTextFile(selected);
+        const backup = JSON.parse(raw) as { vaultFile?: unknown };
+        await invoke("import_vault", { backup });
+        setEntries([]);
+        setIsAddModalOpen(false);
+        setAddLabel("");
+        setAddWebsite("");
+        setAddRows([createAddAccountRow()]);
+        setEditingEntryId(null);
+        setNewEntry(EMPTY_ENTRY);
+        setRevealId(null);
+        setRevealedPassword(null);
+        setMode("locked");
+        setSuccess("Vault imported. Please unlock with the backup's master password.");
+      }
     } catch (err) {
       setError(String(err));
     }
@@ -788,9 +825,9 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.05),transparent_24%),radial-gradient(circle_at_85%_8%,rgba(255,255,255,0.05),transparent_20%),radial-gradient(circle_at_75%_85%,rgba(255,255,255,0.08),transparent_24%),linear-gradient(180deg,#0b0f10_0%,#101415_55%,#0b0f10_100%)] text-foreground">
+    <div className="min-h-screen text-foreground">
       <div className="mx-auto grid min-h-screen max-w-400 lg:grid-cols-[260px_1fr]">
-        <aside className="border-r border-white/10 bg-black/20 px-4 py-5 backdrop-blur-2xl">
+        <aside className="border-r border-white/10 bg-black/10 px-4 py-5">
           <div className="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/80">
@@ -836,7 +873,7 @@ function App() {
 
         <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex h-full flex-col gap-6">
-            <header className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+            <header className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:px-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-1 items-center gap-3">
                 <div className="relative w-full max-w-xl">
                   <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/35" />
@@ -1022,7 +1059,35 @@ function App() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 space-y-4 overflow-y-auto px-6 py-6 pr-3">
+            <CardContent className="flex-1 space-y-6 overflow-y-auto px-6 py-6 pr-3">
+              <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-white">Categorize & Prioritize</p>
+                  <p className="text-xs text-white/40">Select a folder and toggle favorite status.</p>
+                </div>
+                <button
+                  onClick={() => setNewEntry(prev => ({ ...prev, isFavorite: !prev.isFavorite }))}
+                  className={`p-2.5 rounded-xl border transition-all ${newEntry.isFavorite ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-500" : "bg-white/5 border-white/10 text-white/40 hover:text-white"}`}
+                >
+                  <Star className={`size-5 ${newEntry.isFavorite ? "fill-current" : ""}`} />
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {(["Personal", "Work", "Social", "Finance", "Other"] as const).map((cat) => {
+                  const Icon = cat === "Personal" ? User : cat === "Work" ? Briefcase : cat === "Social" ? Share2 : cat === "Finance" ? Wallet : ShieldIcon;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setNewEntry(prev => ({ ...prev, category: cat }))}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium ${newEntry.category === cat ? "bg-white text-slate-950 border-white" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white"}`}
+                    >
+                      <Icon className="size-4" />
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
               {editingEntryId ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">

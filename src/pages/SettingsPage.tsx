@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import type { SidebarSection, VaultSettings } from "../types/vault";
+import type { AppTheme, SidebarSection, VaultSettings } from "../types/vault";
 
 const STORAGE_KEY = "veryfied-settings";
 
@@ -15,7 +15,7 @@ type SettingsPageProps = {
   settings: VaultSettings;
   onSettingsChange: (settings: VaultSettings) => void;
   onExportBackup: () => Promise<void>;
-  onImportBackup: (file: File) => Promise<void>;
+  onImportBackup: () => Promise<void>;
   onResetVault: () => void;
 };
 
@@ -30,7 +30,6 @@ export function SettingsPage({
   const [newMasterPassword, setNewMasterPassword] = useState("");
   const [isChanging, setIsChanging] = useState(false);
   const [changeStatus, setChangeStatus] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -125,11 +124,30 @@ export function SettingsPage({
                 />
               </div>
 
+              <div className="space-y-3">
+                <Label className="text-xs uppercase tracking-widest text-white/40">Glass Theme</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(["obsidian", "midnight-purple", "frosted-silver"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => onSettingsChange({ ...settings, theme: t })}
+                      className={`group relative h-20 overflow-hidden rounded-2xl border transition-all ${settings.theme === t ? "border-white ring-1 ring-white/20" : "border-white/10 bg-white/5 hover:bg-white/10"}`}
+                    >
+                      <div className={`absolute inset-0 opacity-40 transition-opacity group-hover:opacity-60 ${t === "obsidian" ? "bg-zinc-900" : t === "midnight-purple" ? "bg-purple-950" : "bg-slate-800"}`} />
+                      <div className="relative z-10 flex flex-col items-center gap-2">
+                        <div className={`size-4 rounded-full shadow-lg ${t === "obsidian" ? "bg-white" : t === "midnight-purple" ? "bg-purple-500 shadow-purple-500/50" : "bg-slate-200 shadow-slate-200/50"}`} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">{t.split("-")[0]}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-white/10">
                 <div className="flex items-center justify-between gap-4">
                   <p className="text-xs uppercase tracking-widest text-white/40 font-semibold">Vault Backup</p>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10 px-4">
+                    <Button variant="outline" size="sm" onClick={onImportBackup} className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10 px-4">
                       <Upload className="mr-2 size-3" />
                       Import
                     </Button>
@@ -139,17 +157,6 @@ export function SettingsPage({
                     </Button>
                   </div>
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/json"
-                  className="hidden"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    if (file) await onImportBackup(file);
-                    event.currentTarget.value = "";
-                  }}
-                />
               </div>
             </CardContent>
           </Card>

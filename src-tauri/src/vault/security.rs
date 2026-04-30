@@ -43,6 +43,8 @@ pub fn normalize_entry_input(input: &VaultEntryInput) -> VaultEntryInput {
             .map(|tag| tag.trim().to_string())
             .filter(|tag| !tag.is_empty())
             .collect(),
+        category: input.category.clone(),
+        is_favorite: input.is_favorite,
     }
 }
 

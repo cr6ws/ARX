@@ -8,8 +8,43 @@
   font-size: 16px;
   line-height: 1.5;
   font-weight: 400;
-  background: #101415;
-  color: #e0e3e5;
+
+  /* Obsidian (Default Monochrome) */
+  --theme-bg: #0b0f10;
+  --theme-bg-secondary: #101415;
+  --theme-gradient-1: rgba(255, 255, 255, 0.04);
+  --theme-gradient-2: rgba(255, 255, 255, 0.02);
+  --theme-gradient-3: rgba(255, 255, 255, 0.01);
+  --theme-accent: 255, 255, 255;
+  --theme-text: #e0e3e5;
+  --theme-text-muted: rgba(255, 255, 255, 0.45);
+  --theme-glass: rgba(255, 255, 255, 0.03);
+  --theme-border: rgba(255, 255, 255, 0.08);
+  --theme-accent-glow: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="midnight-purple"] {
+  --theme-bg: #080510;
+  --theme-bg-secondary: #0f0a1d;
+  --theme-gradient-1: rgba(139, 92, 246, 0.1);
+  --theme-gradient-2: rgba(192, 132, 252, 0.06);
+  --theme-gradient-3: rgba(139, 92, 246, 0.04);
+  --theme-accent: 167, 139, 250;
+  --theme-glass: rgba(139, 92, 246, 0.05);
+  --theme-border: rgba(139, 92, 246, 0.12);
+  --theme-accent-glow: rgba(139, 92, 246, 0.2);
+}
+
+[data-theme="frosted-silver"] {
+  --theme-bg: #0d0f12;
+  --theme-bg-secondary: #16191d;
+  --theme-gradient-1: rgba(226, 232, 240, 0.08);
+  --theme-gradient-2: rgba(148, 163, 184, 0.04);
+  --theme-gradient-3: rgba(255, 255, 255, 0.01);
+  --theme-accent: 241, 245, 249;
+  --theme-glass: rgba(255, 255, 255, 0.04);
+  --theme-border: rgba(255, 255, 255, 0.1);
+  --theme-accent-glow: rgba(255, 255, 255, 0.15);
 }
 
 * {
@@ -25,11 +60,37 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 18% 15%, rgba(78, 222, 163, 0.18), transparent 22%),
-    radial-gradient(circle at 82% 8%, rgba(192, 193, 255, 0.14), transparent 18%),
-    radial-gradient(circle at 78% 85%, rgba(17, 94, 106, 0.24), transparent 24%),
-    linear-gradient(180deg, #0b0f10 0%, #101415 52%, #0b0f10 100%);
-  color: #e0e3e5;
+    radial-gradient(circle at 18% 15%, var(--theme-gradient-1), transparent 35%),
+    radial-gradient(circle at 82% 8%, var(--theme-gradient-2), transparent 30%),
+    radial-gradient(circle at 78% 85%, var(--theme-gradient-3), transparent 40%),
+    linear-gradient(180deg, var(--theme-bg) 0%, var(--theme-bg-secondary) 52%, var(--theme-bg) 100%);
+  color: var(--theme-text);
+  transition: background 0.5s ease;
+}
+
+/* 
+   FIX: Removed broad backdrop-filter overrides. 
+   Stacking multiple backdrop-filters often causes the "white vertical band" artifact.
+*/
+[data-theme] .bg-white\/5,
+[data-theme] .bg-black\/20 {
+  background-color: var(--theme-glass) !important;
+}
+
+[data-theme] .border-white\/10 {
+  border-color: var(--theme-border) !important;
+}
+
+/* Accent Buttons */
+button.bg-white {
+  background-color: rgb(var(--theme-accent)) !important;
+  box-shadow: 0 0 15px var(--theme-accent-glow);
+}
+
+/* Sidebar Specific Fix */
+nav button.bg-white\/10 {
+  background-color: var(--theme-accent-glow) !important;
+  border-color: transparent !important;
 }
 
 .vault-progress-0 { width: 0%; }
@@ -43,3 +104,15 @@ body {
 .vault-progress-80 { width: 80%; }
 .vault-progress-90 { width: 90%; }
 .vault-progress-100 { width: 100%; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--theme-border);
+  border-radius: 10px;
+}

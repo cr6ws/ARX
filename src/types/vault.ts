@@ -4,12 +4,16 @@ export type VaultStatus = {
   hint?: string | null;
 };
 
+export type VaultCategory = "Personal" | "Work" | "Social" | "Finance" | "Other";
+
 export type VaultEntrySummary = {
   id: string;
   label: string;
   username: string;
   url?: string | null;
   tags: string[];
+  category: VaultCategory;
+  isFavorite: boolean;
   updatedAt: number;
 };
 
@@ -21,6 +25,8 @@ export type VaultEntry = {
   url?: string | null;
   notes?: string | null;
   tags: string[];
+  category: VaultCategory;
+  isFavorite: boolean;
   createdAt: number;
   updatedAt: number;
 };
@@ -32,7 +38,11 @@ export type VaultEntryInput = {
   url?: string;
   notes?: string;
   tags: string[];
+  category: VaultCategory;
+  isFavorite: boolean;
 };
+
+export type AppTheme = "obsidian" | "midnight-purple" | "frosted-silver";
 
 export type VaultSettings = {
   autoLockMinutes: number;
@@ -40,6 +50,7 @@ export type VaultSettings = {
   clipboardClearSeconds: number;
   defaultSection: SidebarSection;
   compactRows: boolean;
+  theme: AppTheme;
 };
 
 export type SidebarSection = "overview" | "audit" | "passwords" | "settings";

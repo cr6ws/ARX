@@ -2,6 +2,21 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use zeroize::Zeroize;
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum VaultCategory {
+    Personal,
+    Work,
+    Social,
+    Finance,
+    Other,
+}
+
+impl Default for VaultCategory {
+    fn default() -> Self {
+        VaultCategory::Other
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultEntryInput {
@@ -11,6 +26,9 @@ pub struct VaultEntryInput {
     pub url: Option<String>,
     pub notes: Option<String>,
     pub tags: Vec<String>,
+    pub category: VaultCategory,
+    #[serde(default)]
+    pub is_favorite: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -23,6 +41,9 @@ pub struct VaultEntry {
     pub url: Option<String>,
     pub notes: Option<String>,
     pub tags: Vec<String>,
+    pub category: VaultCategory,
+    #[serde(default)]
+    pub is_favorite: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -35,6 +56,8 @@ pub struct VaultEntrySummary {
     pub username: String,
     pub url: Option<String>,
     pub tags: Vec<String>,
+    pub category: VaultCategory,
+    pub is_favorite: bool,
     pub updated_at: i64,
 }
 
@@ -46,6 +69,8 @@ impl VaultEntrySummary {
             username: entry.username.clone(),
             url: entry.url.clone(),
             tags: entry.tags.clone(),
+            category: entry.category.clone(),
+            is_favorite: entry.is_favorite,
             updated_at: entry.updated_at,
         }
     }

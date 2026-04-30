@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardCopy, Eye, PencilLine, Plus, Trash2 } from "lucide-react";
+import { ClipboardCopy, Eye, PencilLine, Plus, Trash2, Star, User, Briefcase, Share2, Wallet, Shield } from "lucide-react";
 
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -99,6 +99,14 @@ export function PasswordsPage({
     return () => window.clearTimeout(timer);
   }, [highlightedEntryId]);
 
+  const sortedEntries = useMemo(() => {
+    return [...entries].sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return b.updatedAt - a.updatedAt;
+    });
+  }, [entries]);
+
   return (
     <section className="space-y-6">
       <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
@@ -128,83 +136,95 @@ export function PasswordsPage({
                 <span>Actions</span>
               </div>
               <div className="divide-y divide-white/10">
-                {entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    ref={(node) => {
-                      rowRefs.current[entry.id] = node;
-                    }}
-                    className={`px-6 py-3 transition duration-500 ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""}`}
-                  >
-                    <div className={rowClassName}>
-                      <div className="flex items-center justify-center">
-                        <EntryLogo entry={entry} />
-                      </div>
-                      <div className="min-w-0 text-center">
-                        <p className="truncate text-[13px] font-semibold text-white sm:text-sm">{entry.label}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(entry.username);
-                        }}
-                        className="truncate text-[13px] text-white/70 hover:text-white transition-colors sm:text-sm text-center"
-                        title="Click to copy username"
-                      >
-                        {entry.username}
-                      </button>
-                      <p className="text-[13px] text-white/70 sm:text-sm">{new Date(entry.updatedAt * 1000).toLocaleDateString()}</p>
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Button
-                          variant="outline"
-                          onClick={() => onReveal(entry.id)}
-                          disabled={isBusy}
-                          className={`h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10 ${revealedEntryId === entry.id ? "bg-white text-black hover:bg-white/90 border-white" : ""}`}
-                          aria-label={revealedEntryId === entry.id ? "Hide password" : `Reveal password for ${entry.label}`}
-                        >
-                          <Eye className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => onEditItem(entry.id)}
-                          disabled={isBusy}
-                          className="h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-                          aria-label={`Edit ${entry.label}`}
-                        >
-                          <PencilLine className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => onDelete(entry.id)}
-                          disabled={isBusy}
-                          className="h-8 w-8 rounded-full border-white/20 bg-white/10 p-0 text-white hover:bg-white/15"
-                          aria-label={`Delete ${entry.label}`}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {revealedEntryId === entry.id && revealedPassword && (
-                      <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">Revealed password</p>
-                            <p className="mt-2 break-all font-mono text-sm text-white">{revealedPassword}</p>
+                {sortedEntries.map((entry) => {
+                  const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
+                  return (
+                    <div
+                      key={entry.id}
+                      ref={(node) => {
+                        rowRefs.current[entry.id] = node;
+                      }}
+                      className={`px-6 py-3 transition duration-500 ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""} ${entry.isFavorite ? "bg-white/[0.03]" : ""}`}
+                    >
+                      <div className={rowClassName}>
+                        <div className="flex items-center justify-center relative">
+                          <EntryLogo entry={entry} />
+                          {entry.isFavorite && (
+                            <div className="absolute -top-1 -right-1 size-5 bg-yellow-500 rounded-full flex items-center justify-center border-2 border-[#151a1c] shadow-lg">
+                              <Star className="size-2.5 text-black fill-current" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 text-center flex flex-col items-center gap-1">
+                          <p className="truncate text-[13px] font-semibold text-white sm:text-sm">{entry.label}</p>
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
+                            <CategoryIcon className="size-3 text-white/40" />
+                            <span className="text-[9px] uppercase tracking-wider text-white/40 font-medium">{entry.category}</span>
                           </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(entry.username);
+                          }}
+                          className="truncate text-[13px] text-white/70 hover:text-white transition-colors sm:text-sm text-center"
+                          title="Click to copy username"
+                        >
+                          {entry.username}
+                        </button>
+                        <p className="text-[13px] text-white/70 sm:text-sm">{new Date(entry.updatedAt * 1000).toLocaleDateString()}</p>
+                        <div className="flex items-center justify-center gap-1.5">
                           <Button
                             variant="outline"
-                            onClick={() => onCopyPassword(revealedPassword)}
-                            className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                            onClick={() => onReveal(entry.id)}
+                            disabled={isBusy}
+                            className={`h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10 ${revealedEntryId === entry.id ? "bg-white text-black hover:bg-white/90 border-white" : ""}`}
+                            aria-label={revealedEntryId === entry.id ? "Hide password" : `Reveal password for ${entry.label}`}
                           >
-                            <ClipboardCopy className="mr-2 size-4" />
-                            Copy
+                            <Eye className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => onEditItem(entry.id)}
+                            disabled={isBusy}
+                            className="h-8 w-8 rounded-full border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                            aria-label={`Edit ${entry.label}`}
+                          >
+                            <PencilLine className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => onDelete(entry.id)}
+                            disabled={isBusy}
+                            className="h-8 w-8 rounded-full border-white/20 bg-white/10 p-0 text-white hover:bg-white/15"
+                            aria-label={`Delete ${entry.label}`}
+                          >
+                            <Trash2 className="size-3.5" />
                           </Button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {revealedEntryId === entry.id && revealedPassword && (
+                        <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">Revealed password</p>
+                              <p className="mt-2 break-all font-mono text-sm text-white">{revealedPassword}</p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              onClick={() => onCopyPassword(revealedPassword)}
+                              className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                            >
+                              <ClipboardCopy className="mr-2 size-4" />
+                              Copy
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

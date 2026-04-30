@@ -14,6 +14,8 @@ const EMPTY_ENTRY: VaultEntryInput = {
   url: "",
   notes: "",
   tags: [],
+  category: "Other",
+  isFavorite: false,
 };
 
 type EntryModalProps = {
@@ -106,9 +108,8 @@ export function EntryModal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center transition-opacity duration-200 ease-out ${
-        isVisible ? "opacity-100" : "opacity-0"
-      }`}
+      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center transition-opacity duration-200 ease-out ${isVisible ? "opacity-100" : "opacity-0"
+        }`}
     >
       <button
         type="button"
@@ -117,9 +118,8 @@ export function EntryModal({
         onClick={onClose}
       />
       <Card
-        className={`relative z-10 flex w-full max-w-2xl max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)] transition-opacity duration-200 ease-out ${
-          isVisible ? "opacity-100" : "opacity-0"
-        }`}
+        className={`relative z-10 flex w-full max-w-2xl max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)] transition-opacity duration-200 ease-out ${isVisible ? "opacity-100" : "opacity-0"
+          }`}
       >
         <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
           <div className="flex items-start justify-between gap-4">

@@ -123,6 +123,8 @@ pub fn add_entry(
         url: input.url,
         notes: input.notes,
         tags: input.tags,
+        category: input.category,
+        is_favorite: input.is_favorite,
         created_at: now,
         updated_at: now,
     };
@@ -189,6 +191,8 @@ pub fn update_entry(
     updated_entry.url = input.url;
     updated_entry.notes = input.notes;
     updated_entry.tags = input.tags;
+    updated_entry.category = input.category;
+    updated_entry.is_favorite = input.is_favorite;
     updated_entry.updated_at = now_epoch();
 
     let entry = updated_entry.clone();
