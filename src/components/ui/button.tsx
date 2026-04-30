@@ -5,11 +5,11 @@ import { Slot } from "radix-ui"
 import { cn } from "../../lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-2xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:ring-3 focus-visible:ring-emerald-400/30 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-rose-400/30 aria-invalid:ring-3 aria-invalid:ring-rose-400/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-2xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:ring-3 focus-visible:ring-white/20 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-white/25 aria-invalid:ring-3 aria-invalid:ring-white/15 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
-    variants: {
+    variants: { 
       variant: {
-        default: "bg-emerald-400 text-slate-950 shadow-[0_14px_28px_rgba(16,185,129,0.22)] hover:bg-emerald-300",
+        default: "bg-white text-slate-950 shadow-[0_14px_28px_rgba(255,255,255,0.14)] hover:bg-white/90",
         outline:
           "border-white/10 bg-white/5 text-white hover:bg-white/10 aria-expanded:bg-white/10 aria-expanded:text-white",
         secondary:
@@ -17,8 +17,8 @@ const buttonVariants = cva(
         ghost:
           "text-white/75 hover:bg-white/8 hover:text-white aria-expanded:bg-white/8 aria-expanded:text-white",
         destructive:
-          "border border-rose-400/20 bg-rose-500/15 text-rose-100 hover:bg-rose-500/25 focus-visible:border-rose-400/40 focus-visible:ring-rose-400/20",
-        link: "text-emerald-300 underline-offset-4 hover:underline",
+          "border border-white/20 bg-white/10 text-white hover:bg-white/15 focus-visible:border-white/30 focus-visible:ring-white/20",
+        link: "text-white underline-offset-4 hover:underline",
       },
       size: {
         default:

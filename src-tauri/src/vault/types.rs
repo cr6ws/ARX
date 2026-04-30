@@ -10,6 +10,7 @@ pub struct VaultEntryInput {
     pub password: String,
     pub url: Option<String>,
     pub notes: Option<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -21,6 +22,7 @@ pub struct VaultEntry {
     pub password: String,
     pub url: Option<String>,
     pub notes: Option<String>,
+    pub tags: Vec<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -32,6 +34,7 @@ pub struct VaultEntrySummary {
     pub label: String,
     pub username: String,
     pub url: Option<String>,
+    pub tags: Vec<String>,
     pub updated_at: i64,
 }
 
@@ -42,6 +45,7 @@ impl VaultEntrySummary {
             label: entry.label.clone(),
             username: entry.username.clone(),
             url: entry.url.clone(),
+            tags: entry.tags.clone(),
             updated_at: entry.updated_at,
         }
     }
@@ -64,6 +68,12 @@ pub struct VaultFile {
     pub salt_b64: String,
     pub nonce_b64: String,
     pub ciphertext_b64: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultBackup {
+    pub vault_file: VaultFile,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

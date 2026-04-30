@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   AlertTriangle,
-  ChevronRight,
-  Eye,
   KeyRound,
   LayoutGrid,
   LockKeyhole,
@@ -11,17 +9,15 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
-  Trash2,
 } from "lucide-react";
+import arxLogo from "./assets/ARX.png";
 
 import {
   decideInitialMode,
   sortEntriesByUpdated,
   type VaultMode,
 } from "./ai/agents/uiAgent";
-import { UI_RULES } from "./ai/instructions";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
-import { Badge } from "./components/ui/badge";
 import {
   Card,
   CardContent,
@@ -32,29 +28,19 @@ import {
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
-import { Separator } from "./components/ui/separator";
-import { Textarea } from "./components/ui/textarea";
+import { StarsBackground } from "./components/animate-ui/components/backgrounds/stars";
 
-type VaultStatus = {
-  hasVault: boolean;
-  isUnlocked: boolean;
-};
-
-type VaultEntrySummary = {
-  id: string;
-  label: string;
-  username: string;
-  url?: string | null;
-  updatedAt: number;
-};
-
-type VaultEntryInput = {
-  label: string;
-  username: string;
-  password: string;
-  url?: string;
-  notes?: string;
-};
+import { PasswordsPage } from "./pages/PasswordsPage";
+import { SecurityAuditPage } from "./pages/SecurityAuditPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import type {
+  SidebarSection,
+  VaultEntry,
+  VaultEntryInput,
+  VaultEntrySummary,
+  VaultSettings,
+  VaultStatus,
+} from "./types/vault";
 
 const EMPTY_ENTRY: VaultEntryInput = {
   label: "",
@@ -62,9 +48,44 @@ const EMPTY_ENTRY: VaultEntryInput = {
   password: "",
   url: "",
   notes: "",
+  tags: [],
 };
 
-type SidebarSection = "overview" | "audit" | "passwords" | "settings";
+const DEFAULT_SETTINGS: VaultSettings = {
+  autoLockMinutes: 5,
+  revealTimeoutSeconds: 10,
+  clipboardClearSeconds: 15,
+  defaultSection: "overview",
+  compactRows: false,
+};
+
+function generatePassword(length = 20) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*_-";
+  const values = crypto.getRandomValues(new Uint32Array(length));
+  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
+}
+
+function parseTagsText(tagsText: string) {
+  return tagsText
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+type AddAccountRow = {
+  id: string;
+  username: string;
+  password: string;
+};
+
+function createAddAccountRow(overrides?: Partial<AddAccountRow>) {
+  return {
+    id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    username: "",
+    password: "",
+    ...overrides,
+  };
+}
 
 const navigationItems: Array<{
   icon: typeof LayoutGrid;
@@ -82,27 +103,47 @@ function App() {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [masterPassword, setMasterPassword] = useState("");
-  const [masterConfirm, setMasterConfirm] = useState("");
   const [entries, setEntries] = useState<VaultEntrySummary[]>([]);
   const [newEntry, setNewEntry] = useState<VaultEntryInput>(EMPTY_ENTRY);
+  const [addLabel, setAddLabel] = useState("");
+  const [addWebsite, setAddWebsite] = useState("");
+  const [addTagsText, setAddTagsText] = useState("");
+  const [addRows, setAddRows] = useState<AddAccountRow[]>([createAddAccountRow()]);
   const [revealId, setRevealId] = useState<string | null>(null);
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSection, setActiveSection] = useState<SidebarSection>("overview");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  const securityNotice = useMemo(() => UI_RULES.slice(0, 2), []);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [entryTagsText, setEntryTagsText] = useState("");
+  const [settings, setSettings] = useState<VaultSettings>(DEFAULT_SETTINGS);
+  const [activityTick, setActivityTick] = useState(0);
+  const [auditRunId, setAuditRunId] = useState(0);
+  const [isAddModalMounted, setIsAddModalMounted] = useState(false);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const clipboardTimer = useRef<number | null>(null);
 
   const filteredEntries = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return entries;
     return entries.filter((entry) => {
-      const haystack = [entry.label, entry.username, entry.url ?? ""]
+      const haystack = [entry.label, entry.username, entry.url ?? "", entry.tags.join(" ")]
         .join(" ")
         .toLowerCase();
       return haystack.includes(query);
     });
   }, [entries, searchTerm]);
+
+  const highlightedEntryId = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return null;
+
+    const exactMatch = filteredEntries.find((entry) => {
+      return entry.label.trim().toLowerCase() === query || entry.username.trim().toLowerCase() === query;
+    });
+
+    return (exactMatch ?? filteredEntries[0])?.id ?? null;
+  }, [filteredEntries, searchTerm]);
 
   const totalItems = entries.length;
   const vaultHealth = useMemo(() => {
@@ -113,8 +154,6 @@ function App() {
   const progressBucket = useMemo(() => {
     return Math.min(100, Math.max(0, Math.round(vaultHealth / 10) * 10));
   }, [vaultHealth]);
-
-  const recentEntries = useMemo(() => filteredEntries.slice(0, 5), [filteredEntries]);
 
   const activeSectionTitle = useMemo(() => {
     switch (activeSection) {
@@ -166,6 +205,23 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const stored = window.localStorage.getItem("veryfied-settings");
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as Partial<VaultSettings>;
+      setSettings({
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+      });
+      if (parsed.defaultSection) {
+        setActiveSection(parsed.defaultSection);
+      }
+    } catch {
+      window.localStorage.removeItem("veryfied-settings");
+    }
+  }, []);
+
+  useEffect(() => {
     if (mode !== "unlocked") return;
     loadEntries();
   }, [mode]);
@@ -197,16 +253,11 @@ function App() {
       setError("Master password must be at least 8 characters.");
       return;
     }
-    if (masterPassword !== masterConfirm) {
-      setError("Master passwords do not match.");
-      return;
-    }
     setIsBusy(true);
     setError(null);
     try {
       await invoke("init_vault", { masterPassword });
       setMasterPassword("");
-      setMasterConfirm("");
       setMode("unlocked");
     } catch (err) {
       setError(String(err));
@@ -241,6 +292,15 @@ function App() {
       setEntries([]);
       setSearchTerm("");
       setIsAddModalOpen(false);
+      setEditingEntryId(null);
+      setEntryTagsText("");
+      setNewEntry(EMPTY_ENTRY);
+      setRevealId(null);
+      setRevealedPassword(null);
+      if (clipboardTimer.current) {
+        window.clearTimeout(clipboardTimer.current);
+        clipboardTimer.current = null;
+      }
       setMode("locked");
     } catch (err) {
       setError(String(err));
@@ -261,12 +321,17 @@ function App() {
       await invoke("reset_vault");
       setEntries([]);
       setNewEntry(EMPTY_ENTRY);
+      setEntryTagsText("");
+      setAddLabel("");
+      setAddWebsite("");
+      setAddTagsText("");
+      setAddRows([createAddAccountRow()]);
       setSearchTerm("");
       setMasterPassword("");
-      setMasterConfirm("");
       setRevealId(null);
       setRevealedPassword(null);
       setIsAddModalOpen(false);
+      setEditingEntryId(null);
       setActiveSection("overview");
       setMode("setup");
     } catch (err) {
@@ -276,27 +341,52 @@ function App() {
     }
   };
 
-  const handleAddEntry = async () => {
-    if (!newEntry.label.trim() || !newEntry.username.trim()) {
-      setError("Label and username are required.");
+  const handleSaveEntry = async () => {
+    if (!addLabel.trim()) {
+      setError("Label is required.");
       return;
     }
-    if (newEntry.password.length < 8) {
-      setError("Password must be at least 8 characters.");
+
+    const commonTags = parseTagsText(addTagsText);
+    const validRows = addRows.filter((row) => row.username.trim() && row.password.length >= 8);
+
+    if (validRows.length === 0) {
+      setError("Add at least one username and password row.");
       return;
     }
+
     setIsBusy(true);
     setError(null);
     try {
-      const payload: VaultEntryInput = {
-        label: newEntry.label.trim(),
-        username: newEntry.username.trim(),
-        password: newEntry.password,
-        url: newEntry.url?.trim() ? newEntry.url.trim() : undefined,
-        notes: newEntry.notes?.trim() ? newEntry.notes.trim() : undefined,
-      };
-      await invoke("add_password", { entry: payload });
+      if (editingEntryId) {
+        const payload: VaultEntryInput = {
+          label: newEntry.label.trim(),
+          username: newEntry.username.trim(),
+          password: newEntry.password,
+          url: newEntry.url?.trim() ? newEntry.url.trim() : undefined,
+          tags: commonTags,
+        };
+        await invoke("update_password", { id: editingEntryId, entry: payload });
+      } else {
+        for (const row of validRows) {
+          await invoke("add_password", {
+            entry: {
+              label: addLabel.trim(),
+              username: row.username.trim(),
+              password: row.password,
+              url: addWebsite.trim() ? addWebsite.trim() : undefined,
+              tags: commonTags,
+            },
+          });
+        }
+      }
       setNewEntry(EMPTY_ENTRY);
+      setEntryTagsText("");
+      setAddLabel("");
+      setAddWebsite("");
+      setAddTagsText("");
+      setAddRows([createAddAccountRow()]);
+      setEditingEntryId(null);
       setIsAddModalOpen(false);
       await loadEntries();
     } catch (err) {
@@ -326,6 +416,10 @@ function App() {
       const password = await invoke<string>("get_password", { id });
       setRevealId(id);
       setRevealedPassword(password);
+      if (clipboardTimer.current) {
+        window.clearTimeout(clipboardTimer.current);
+        clipboardTimer.current = null;
+      }
     } catch (err) {
       setError(String(err));
     } finally {
@@ -333,191 +427,221 @@ function App() {
     }
   };
 
+  const handleRunAudit = () => {
+    setAuditRunId((value) => value + 1);
+    setActiveSection("audit");
+  };
+
+  const handleCopyPassword = async (password: string) => {
+    await navigator.clipboard.writeText(password);
+    if (clipboardTimer.current) {
+      window.clearTimeout(clipboardTimer.current);
+    }
+    clipboardTimer.current = window.setTimeout(() => {
+      void navigator.clipboard.writeText("");
+      clipboardTimer.current = null;
+    }, settings.clipboardClearSeconds * 1000);
+  };
+
   const openAddModal = () => {
     setError(null);
+    setEditingEntryId(null);
+    setNewEntry(EMPTY_ENTRY);
+    setEntryTagsText("");
+    setAddLabel("");
+    setAddWebsite("");
+    setAddTagsText("");
+    setAddRows([createAddAccountRow()]);
     setIsAddModalOpen(true);
   };
 
+  const closeAddModal = () => {
+    setIsAddModalOpen(false);
+    setAddLabel("");
+    setAddWebsite("");
+    setAddTagsText("");
+    setAddRows([createAddAccountRow()]);
+  };
+
+  const handleEditEntry = async (id: string) => {
+    const entry = entries.find((item) => item.id === id);
+    if (!entry) {
+      setError("Entry not found.");
+      return;
+    }
+
+    setIsBusy(true);
+    setError(null);
+    try {
+      const fullEntry = await invoke<VaultEntry>("get_entry", { id });
+      setEditingEntryId(id);
+      setNewEntry({
+        label: fullEntry.label,
+        username: fullEntry.username,
+        password: fullEntry.password,
+        url: fullEntry.url ?? "",
+        notes: fullEntry.notes ?? "",
+        tags: fullEntry.tags,
+      });
+      setEntryTagsText(fullEntry.tags.join(", "));
+      setIsAddModalOpen(true);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleSettingsChange = (nextSettings: VaultSettings) => {
+    setSettings(nextSettings);
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      const backup = await invoke<{ vaultFile: unknown }>("export_vault");
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `veryfied-vault-backup-${Date.now()}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleImportBackup = async (file: File) => {
+    try {
+      const raw = await file.text();
+      const backup = JSON.parse(raw) as { vaultFile?: unknown };
+      await invoke("import_vault", { backup });
+      setEntries([]);
+      setIsAddModalOpen(false);
+      setAddLabel("");
+      setAddWebsite("");
+      setAddTagsText("");
+      setAddRows([createAddAccountRow()]);
+      setEditingEntryId(null);
+      setNewEntry(EMPTY_ENTRY);
+      setEntryTagsText("");
+      setRevealId(null);
+      setRevealedPassword(null);
+      setMode("locked");
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  useEffect(() => {
+    if (mode !== "unlocked") return;
+
+    const bumpActivity = () => setActivityTick((value) => value + 1);
+    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "scroll", "mousemove", "focus"];
+
+    events.forEach((eventName) => window.addEventListener(eventName, bumpActivity, { passive: true }));
+
+    const timer = window.setTimeout(() => {
+      void handleLock();
+    }, settings.autoLockMinutes * 60 * 1000);
+
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((eventName) => window.removeEventListener(eventName, bumpActivity));
+    };
+  }, [activityTick, handleLock, mode, settings.autoLockMinutes]);
+
+  useEffect(() => {
+    if (mode === "unlocked") {
+      setActiveSection(settings.defaultSection);
+    }
+  }, [mode, settings.defaultSection]);
+
+  useEffect(() => {
+    if (isAddModalOpen) {
+      setIsAddModalMounted(true);
+      const timer = window.setTimeout(() => setIsAddModalVisible(true), 20);
+      return () => window.clearTimeout(timer);
+    }
+
+    setIsAddModalVisible(false);
+    const timer = window.setTimeout(() => setIsAddModalMounted(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [isAddModalOpen]);
+
+  useEffect(() => {
+    if (!searchTerm.trim()) return;
+    setActiveSection("passwords");
+  }, [searchTerm]);
+
   if (mode === "loading") {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,rgba(78,222,163,0.12),transparent_24%),radial-gradient(circle_at_85%_8%,rgba(192,193,255,0.10),transparent_20%),radial-gradient(circle_at_75%_85%,rgba(17,94,106,0.24),transparent_24%),linear-gradient(180deg,#0b0f10_0%,#101415_55%,#0b0f10_100%)] px-4 py-6 text-foreground sm:px-6 lg:px-8">
-        <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-7xl items-center justify-center">
-          <Card className="w-full max-w-xl rounded-[28px] border-white/10 bg-white/5 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
-            <CardHeader>
-              <CardTitle className="text-3xl text-white">Veryfied Vault</CardTitle>
-              <CardDescription className="text-white/70">
-                Checking encrypted vault status...
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 pb-8">
-              <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-1/2 rounded-full bg-emerald-400/80 shadow-[0_0_24px_rgba(78,222,163,0.45)]" />
-              </div>
-              <p className="text-sm text-white/70">
-                Preparing the secure desktop workspace.
-              </p>
+      <StarsBackground className="min-h-screen text-white">
+        <div className="flex min-h-screen items-center justify-center px-4 text-white">
+          <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+            <CardContent className="flex flex-col items-center gap-6 px-8 py-10 text-center">
+              <img src={arxLogo} alt="ARX" className="h-28 w-28 object-contain" />
+              <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">ARX</CardTitle>
             </CardContent>
           </Card>
         </div>
-      </div>
+      </StarsBackground>
     );
   }
 
   if (mode !== "unlocked") {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,rgba(78,222,163,0.12),transparent_24%),radial-gradient(circle_at_85%_8%,rgba(192,193,255,0.10),transparent_20%),radial-gradient(circle_at_75%_85%,rgba(17,94,106,0.24),transparent_24%),linear-gradient(180deg,#0b0f10_0%,#101415_55%,#0b0f10_100%)] px-4 py-6 text-foreground sm:px-6 lg:px-8">
-        <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-7xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <Card className="hidden rounded-[28px] border-white/10 bg-white/5 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl lg:flex lg:flex-col lg:justify-between">
-            <CardHeader className="space-y-4 p-8">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-emerald-200">
-                <ShieldCheck className="size-3.5" />
-                Liquid Glass Vault
+      <StarsBackground className="min-h-screen text-white">
+        <div className="flex min-h-screen items-center justify-center px-4 text-white">
+          <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+            <CardContent className="space-y-6 px-8 py-10">
+              <div className="flex flex-col items-center gap-5 text-center">
+                <img src={arxLogo} alt="ARX" className="h-28 w-28 object-contain" />
+                <CardTitle className="text-5xl font-semibold tracking-[0.35em] text-white">ARX</CardTitle>
               </div>
-              <div className="space-y-3">
-                <CardTitle className="text-5xl font-semibold tracking-tight text-white">
-                  Secure local vault, designed for calm focus.
-                </CardTitle>
-                <CardDescription className="max-w-xl text-lg leading-8 text-white/70">
-                  Keep the desktop app as the trusted layer. Encrypt locally,
-                  avoid plaintext, and move fast without exposing secrets.
-                </CardDescription>
+
+              {error && (
+                <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white">
+                  <p className="font-medium">Action failed</p>
+                  <p className="mt-1 text-white/75">{error}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="unlock-password" className="text-sm text-white/80">
+                  Master password
+                </Label>
+                <Input
+                  id="unlock-password"
+                  type="password"
+                  value={masterPassword}
+                  onChange={(event) => setMasterPassword(event.target.value)}
+                  placeholder={mode === "setup" ? "Create master password" : "Enter master password"}
+                  className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
+                />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4 px-8 pb-8">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {[
-                  "AES-GCM encrypted storage",
-                  "Rust handles secrets",
-                  "Local-only MVP",
-                  "No plaintext in UI state",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 backdrop-blur-xl"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-              <Separator className="bg-white/10" />
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-sm leading-7 text-white/70 backdrop-blur-xl">
-                The UI can change freely. The backend contract stays stable so
-                Rust continues to own storage and encryption.
-              </div>
+
+              <Button
+                onClick={mode === "setup" ? handleInitVault : handleUnlock}
+                disabled={isBusy}
+                size="lg"
+                className="h-12 w-full rounded-2xl border border-white bg-white text-sm font-semibold text-black shadow-none hover:bg-white/90"
+              >
+                {mode === "setup" ? "Create vault" : "Unlock vault"}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleResetVault}
+                disabled={isBusy}
+                className="h-11 w-full rounded-2xl border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              >
+                Reset vault on this device
+              </Button>
             </CardContent>
           </Card>
-
-          <div className="flex items-center justify-center py-2 lg:py-0">
-            <Card className="w-full max-w-xl rounded-[28px] border-white/10 bg-white/5 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
-              <CardHeader className="space-y-4 p-8">
-                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-emerald-200">
-                  <LockKeyhole className="size-3.5" />
-                  {mode === "setup" ? "Create vault" : "Unlock vault"}
-                </div>
-                <div className="space-y-3">
-                  <CardTitle className="text-4xl font-semibold tracking-tight text-white">
-                    {mode === "setup" ? "Create your master password" : "Unlock your vault"}
-                  </CardTitle>
-                  <CardDescription className="max-w-xl text-base leading-7 text-white/70">
-                    {mode === "setup"
-                      ? "You only need to create this once. It becomes the key that unlocks your local encrypted vault."
-                      : "Enter your master password to decrypt your vault locally and continue."}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-5 px-8 pb-8">
-                {error && (
-                  <Alert variant="destructive" className="border-white/10 bg-white/5 text-white">
-                    <AlertTriangle className="size-4 text-rose-300" />
-                    <AlertTitle className="text-white">Action failed</AlertTitle>
-                    <AlertDescription className="text-white/75">{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                {mode === "setup" ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="master-password" className="text-white/80">
-                        Master password
-                      </Label>
-                      <Input
-                        id="master-password"
-                        type="password"
-                        value={masterPassword}
-                        onChange={(event) => setMasterPassword(event.target.value)}
-                        placeholder="At least 8 characters"
-                        className="h-12 rounded-2xl border-white/10 bg-white/8 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="master-confirm" className="text-white/80">
-                        Confirm password
-                      </Label>
-                      <Input
-                        id="master-confirm"
-                        type="password"
-                        value={masterConfirm}
-                        onChange={(event) => setMasterConfirm(event.target.value)}
-                        placeholder="Repeat master password"
-                        className="h-12 rounded-2xl border-white/10 bg-white/8 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="unlock-password" className="text-white/80">
-                      Master password
-                    </Label>
-                    <Input
-                      id="unlock-password"
-                      type="password"
-                      value={masterPassword}
-                      onChange={(event) => setMasterPassword(event.target.value)}
-                      placeholder="Your master password"
-                      className="h-12 rounded-2xl border-white/10 bg-white/8 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                    />
-                  </div>
-                )}
-
-                <Button
-                  onClick={mode === "setup" ? handleInitVault : handleUnlock}
-                  disabled={isBusy}
-                  size="lg"
-                  className="h-12 w-full rounded-2xl bg-linear-to-r from-emerald-400 to-teal-500 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(16,185,129,0.28)] hover:from-emerald-300 hover:to-teal-400"
-                >
-                  {mode === "setup" ? "Create vault" : "Unlock vault"}
-                </Button>
-
-                <div className="space-y-2 rounded-[22px] border border-white/10 bg-black/20 p-4 text-sm text-white/70 backdrop-blur-xl">
-                  {securityNotice.map((rule) => (
-                    <div key={rule} className="flex items-start gap-2">
-                      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-300" />
-                      <span>{rule}</span>
-                    </div>
-                  ))}
-                  {mode !== "setup" && (
-                    <div className="pt-2">
-                      <p className="text-xs leading-6 text-white/55">
-                        If you do not remember the master password, the vault cannot be decrypted.
-                      </p>
-                      <Button
-                        variant="outline"
-                        onClick={handleResetVault}
-                        disabled={isBusy}
-                        className="mt-3 h-10 rounded-full border-rose-400/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/15 hover:text-rose-50"
-                      >
-                        Reset vault on this device
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
-      </div>
+      </StarsBackground>
     );
   }
 
@@ -527,20 +651,11 @@ function App() {
         <aside className="border-r border-white/10 bg-black/20 px-4 py-5 backdrop-blur-2xl">
           <div className="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
             <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-emerald-200">
-                <Sparkles className="size-3.5" />
-                Veryfied
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/80">
+                <img src={arxLogo} alt="ARX" className="size-4 rounded-full object-contain" />
+                ARX
               </div>
-              <p className="text-sm text-white/60">Premium Vault</p>
             </div>
-
-            <Button
-              onClick={openAddModal}
-              className="h-11 rounded-2xl bg-linear-to-r from-emerald-400 to-teal-500 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(16,185,129,0.28)] hover:from-emerald-300 hover:to-teal-400"
-            >
-              <Plus className="mr-2 size-4" />
-              Generate Password
-            </Button>
 
             <nav className="flex flex-1 flex-col gap-2">
               {navigationItems.map((item) => {
@@ -552,7 +667,7 @@ function App() {
                     onClick={() => setActiveSection(item.section)}
                     className={
                       activeSection === item.section
-                        ? "flex items-center gap-3 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-sm font-medium text-emerald-200 shadow-[0_10px_30px_rgba(16,185,129,0.08)]"
+                        ? "flex items-center gap-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-medium text-white shadow-[0_10px_30px_rgba(255,255,255,0.06)]"
                         : "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-white/55 transition hover:bg-white/5 hover:text-white/80"
                     }
                   >
@@ -573,10 +688,6 @@ function App() {
                 <LockKeyhole className="mr-2 size-4" />
                 Lock Vault
               </Button>
-              <div className="space-y-2 text-xs text-white/45">
-                <p>Rust-backed crypto</p>
-                <p>Local encrypted storage only</p>
-              </div>
             </div>
           </div>
         </aside>
@@ -591,7 +702,7 @@ function App() {
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="Search vault..."
-                    className="h-11 rounded-full border-white/10 bg-black/25 pl-10 text-white placeholder:text-white/35 focus-visible:border-emerald-300/40 focus-visible:ring-emerald-400/20"
+                    className="h-11 rounded-full border-white/10 bg-black/25 pl-10 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
                   />
                 </div>
               </div>
@@ -619,7 +730,7 @@ function App() {
 
             {error && (
               <Alert variant="destructive" className="border-white/10 bg-white/5 text-white">
-                <AlertTriangle className="size-4 text-rose-300" />
+                <AlertTriangle className="size-4 text-white" />
                 <AlertTitle className="text-white">Action failed</AlertTitle>
                 <AlertDescription className="text-white/75">{error}</AlertDescription>
               </Alert>
@@ -634,42 +745,8 @@ function App() {
               </p>
             </section>
 
-            {activeSection !== "overview" && (
-              <section className="grid gap-6 xl:grid-cols-2">
-                <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                  <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
-                    <CardTitle className="text-xl text-white">{activeSectionTitle}</CardTitle>
-                    <CardDescription className="text-white/60">
-                      {activeSection === "audit" && "This page is where audit results should live once the backend adds scoring and checks."}
-                      {activeSection === "passwords" && "This page should become the full list view for all stored login items."}
-                      {activeSection === "settings" && "This page should contain safe app preferences and local vault behavior controls."}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 px-6 py-6 text-sm leading-7 text-white/70">
-                    {activeSection === "audit" && (
-                      <>
-                        <p>Show weak password flags, reused credentials, duplicate usernames, stale entries, and missing websites.</p>
-                        <p>For MVP, this can stay informational until the Rust backend exposes audit logic.</p>
-                      </>
-                    )}
-                    {activeSection === "passwords" && (
-                      <>
-                        <p>Show every entry in a clean list with search, reveal, copy, edit, delete, and sort actions.</p>
-                        <p>Right now the data is already available, so this page can be built without changing the backend.</p>
-                      </>
-                    )}
-                    {activeSection === "settings" && (
-                      <>
-                        <p>Keep only safe controls here: auto-lock, reveal timeout, export/import, theme preference, and future sync toggles.</p>
-                        <p>Sync should remain off until you explicitly add a cloud provider or device-to-device sync flow.</p>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
+            {activeSection === "overview" && (
+              <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
               <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
                 <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
                   <div className="flex items-center justify-between gap-4">
@@ -683,8 +760,8 @@ function App() {
                     </div>
                     <Button
                       variant="outline"
-                      disabled
-                      className="rounded-full border-white/10 bg-white/5 text-white/80"
+                      onClick={handleRunAudit}
+                      className="rounded-full border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
                     >
                       Run Audit
                     </Button>
@@ -698,7 +775,7 @@ function App() {
                     </div>
                     <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
                       <div
-                        className={`vault-progress-${progressBucket} h-full rounded-full bg-linear-to-r from-emerald-400 to-teal-400 shadow-[0_0_24px_rgba(78,222,163,0.45)]`}
+                        className={`vault-progress-${progressBucket} h-full rounded-full bg-linear-to-r from-white to-zinc-400 shadow-[0_0_24px_rgba(255,255,255,0.18)]`}
                       />
                     </div>
                     <p className="mt-4 text-sm leading-7 text-white/70">
@@ -747,326 +824,283 @@ function App() {
                   </CardContent>
                 </Card>
               </div>
-            </section>
+              </section>
+            )}
 
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-              <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-xl text-white">Recent Logins</CardTitle>
-                      <CardDescription className="text-white/60">
-                        {searchTerm.trim()
-                          ? `Filtered to ${recentEntries.length} result${recentEntries.length === 1 ? "" : "s"}`
-                          : "Your latest saved entries."}
-                      </CardDescription>
-                    </div>
-                    <Button variant="ghost" className="rounded-full text-white/75 hover:bg-white/10 hover:text-white">
-                      View All <ChevronRight className="ml-1 size-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-6 py-6">
-                  {recentEntries.length === 0 ? (
-                    <div className="rounded-[22px] border border-dashed border-white/10 bg-black/15 p-6 text-sm text-white/60">
-                      No matching entries found. Try a different search, or create a new vault item.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {recentEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="group flex flex-col gap-4 rounded-[22px] border border-white/10 bg-black/20 p-4 transition hover:border-emerald-400/25 hover:bg-black/25 sm:flex-row sm:items-start sm:justify-between"
-                        >
-                          <div className="flex min-w-0 items-start gap-3">
-                            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white">
-                              <KeyRound className="size-5 text-emerald-300" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-white">{entry.label}</p>
-                              <p className="truncate text-sm text-white/60">{entry.username}</p>
-                              <p className="mt-2 truncate text-xs text-white/45">{entry.url ?? "Local vault"}</p>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 flex-row items-center justify-between gap-2 sm:flex-col sm:items-end sm:text-right">
-                            <Badge variant="secondary" className="rounded-full bg-white/10 text-white/70">
-                              Saved
-                            </Badge>
-                            <span className="text-xs text-white/45">
-                              {new Date(entry.updatedAt * 1000).toLocaleDateString()}
-                            </span>
-                          </div>
-
-                          {revealId === entry.id && revealedPassword && (
-                            <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3">
-                              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-200">Revealed password</p>
-                              <p className="mt-2 break-all font-mono text-sm text-white">{revealedPassword}</p>
-                              <p className="mt-2 text-xs text-emerald-100/70">Auto-hides after 10 seconds.</p>
-                            </div>
-                          )}
-
-                          <div className="mt-4 flex gap-2">
-                            <Button
-                              variant="outline"
-                              onClick={() => handleReveal(entry.id)}
-                              disabled={isBusy}
-                              className="h-9 flex-1 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-                            >
-                              <Eye className="mr-2 size-4" />
-                              Reveal
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              onClick={() => handleDelete(entry.id)}
-                              disabled={isBusy}
-                              className="h-9 rounded-full bg-rose-500/15 text-rose-100 hover:bg-rose-500/25"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card
-                id="add-entry-card"
-                className="hidden rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl"
-              >
-                <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
-                  <CardTitle className="text-xl text-white">Login Details</CardTitle>
-                  <CardDescription className="text-white/60">
-                    Store a new password entry inside the encrypted local vault.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 px-6 py-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="entry-label" className="text-white/80">
-                        Label
-                      </Label>
-                      <Input
-                        id="entry-label"
-                        value={newEntry.label}
-                        onChange={(event) =>
-                          setNewEntry((prev) => ({
-                            ...prev,
-                            label: event.target.value,
-                          }))
-                        }
-                        placeholder="e.g. Dribbble"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="entry-username" className="text-white/80">
-                        Username
-                      </Label>
-                      <Input
-                        id="entry-username"
-                        value={newEntry.username}
-                        onChange={(event) =>
-                          setNewEntry((prev) => ({
-                            ...prev,
-                            username: event.target.value,
-                          }))
-                        }
-                        placeholder="alex@example.com"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="entry-password" className="text-white/80">
-                        Password
-                      </Label>
-                      <Input
-                        id="entry-password"
-                        type="password"
-                        value={newEntry.password}
-                        onChange={(event) =>
-                          setNewEntry((prev) => ({
-                            ...prev,
-                            password: event.target.value,
-                          }))
-                        }
-                        placeholder="Minimum 8 characters"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="entry-url" className="text-white/80">
-                        Website
-                      </Label>
-                      <Input
-                        id="entry-url"
-                        value={newEntry.url}
-                        onChange={(event) =>
-                          setNewEntry((prev) => ({
-                            ...prev,
-                            url: event.target.value,
-                          }))
-                        }
-                        placeholder="https://"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                      />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="entry-notes" className="text-white/80">
-                        Secure Notes
-                      </Label>
-                      <Textarea
-                        id="entry-notes"
-                        value={newEntry.notes}
-                        onChange={(event) =>
-                          setNewEntry((prev) => ({
-                            ...prev,
-                            notes: event.target.value,
-                          }))
-                        }
-                        placeholder="Optional context or recovery info"
-                        className="min-h-28 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-                <div className="border-t border-white/10 px-6 py-5">
-                  <Button
-                    onClick={handleAddEntry}
-                    disabled={isBusy}
-                    className="h-11 w-full rounded-2xl bg-linear-to-r from-emerald-400 to-teal-500 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(16,185,129,0.28)] hover:from-emerald-300 hover:to-teal-400"
-                  >
-                    Save entry
-                  </Button>
-                </div>
-              </Card>
-            </section>
+            {activeSection === "audit" && <SecurityAuditPage entries={entries} auditRunId={auditRunId} />}
+            {activeSection === "passwords" && (
+              <PasswordsPage
+                entries={filteredEntries}
+                isBusy={isBusy}
+                onAddItem={openAddModal}
+                onEditItem={handleEditEntry}
+                onReveal={handleReveal}
+                onDelete={handleDelete}
+                onCopyPassword={handleCopyPassword}
+                revealedEntryId={revealId}
+                revealedPassword={revealedPassword}
+                compactRows={settings.compactRows}
+                highlightedEntryId={highlightedEntryId}
+              />
+            )}
+            {activeSection === "settings" && (
+              <SettingsPage
+                settings={settings}
+                onSettingsChange={handleSettingsChange}
+                onExportBackup={handleExportBackup}
+                onImportBackup={handleImportBackup}
+              />
+            )}
           </div>
         </main>
       </div>
 
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
+      {isAddModalMounted && (
+        <div className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center transition-opacity duration-200 ease-out ${isAddModalVisible ? "opacity-100" : "opacity-0"}`}>
           <button
             type="button"
             className="absolute inset-0 cursor-default"
             aria-label="Close add item dialog"
-            onClick={() => setIsAddModalOpen(false)}
+            onClick={closeAddModal}
           />
-          <Card className="relative z-10 w-full max-w-2xl rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)]">
+          <Card className={`relative z-10 flex w-full max-w-2xl max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)] transition-opacity duration-200 ease-out ${isAddModalVisible ? "opacity-100" : "opacity-0"}`}>
             <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <CardTitle className="text-xl text-white">Login Details</CardTitle>
+                  <CardTitle className="text-xl text-white">
+                    {editingEntryId ? "Edit Entry" : "Login Details"}
+                  </CardTitle>
                   <CardDescription className="text-white/60">
-                    Add a password entry without leaving the page.
+                    {editingEntryId
+                      ? "Update the stored password entry without leaving the page."
+                      : "Set one shared label and website, then add one or more username/password rows."}
                   </CardDescription>
                 </div>
                 <Button
                   variant="ghost"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={closeAddModal}
                   className="rounded-full text-white/70 hover:bg-white/10 hover:text-white"
                 >
                   Close
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 px-6 py-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="entry-label-modal" className="text-white/80">
-                    Label
-                  </Label>
-                  <Input
-                    id="entry-label-modal"
-                    value={newEntry.label}
-                    onChange={(event) =>
-                      setNewEntry((prev) => ({
-                        ...prev,
-                        label: event.target.value,
-                      }))
-                    }
-                    placeholder="e.g. Dribbble"
-                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="entry-username-modal" className="text-white/80">
-                    Username
-                  </Label>
-                  <Input
-                    id="entry-username-modal"
-                    value={newEntry.username}
-                    onChange={(event) =>
-                      setNewEntry((prev) => ({
-                        ...prev,
-                        username: event.target.value,
-                      }))
-                    }
-                    placeholder="alex@example.com"
-                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="entry-password-modal" className="text-white/80">
-                    Password
-                  </Label>
-                  <Input
-                    id="entry-password-modal"
-                    type="password"
-                    value={newEntry.password}
-                    onChange={(event) =>
-                      setNewEntry((prev) => ({
-                        ...prev,
-                        password: event.target.value,
-                      }))
-                    }
-                    placeholder="Minimum 8 characters"
-                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="entry-url-modal" className="text-white/80">
-                    Website
-                  </Label>
-                  <Input
-                    id="entry-url-modal"
-                    value={newEntry.url}
-                    onChange={(event) =>
-                      setNewEntry((prev) => ({
-                        ...prev,
-                        url: event.target.value,
-                      }))
-                    }
-                    placeholder="https://"
-                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="entry-notes-modal" className="text-white/80">
-                    Secure Notes
-                  </Label>
-                  <Textarea
-                    id="entry-notes-modal"
-                    value={newEntry.notes}
-                    onChange={(event) =>
-                      setNewEntry((prev) => ({
-                        ...prev,
-                        notes: event.target.value,
-                      }))
-                    }
-                    placeholder="Optional context or recovery info"
-                    className="min-h-28 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-emerald-300/50 focus-visible:ring-emerald-400/25"
-                  />
-                </div>
+            <CardContent className="flex-1 space-y-4 overflow-y-auto px-6 py-6 pr-3">
+              <div className="flex items-center justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setNewEntry((current) => ({ ...current, password: generatePassword() }))}
+                  className="h-10 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                >
+                  <Sparkles className="mr-2 size-4" />
+                  Generate password
+                </Button>
               </div>
+              {editingEntryId ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="entry-label-modal" className="text-white/80">
+                      Label
+                    </Label>
+                    <Input
+                      id="entry-label-modal"
+                      value={newEntry.label}
+                      onChange={(event) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          label: event.target.value,
+                        }))
+                      }
+                      placeholder="e.g. Dribbble"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="entry-username-modal" className="text-white/80">
+                      Username
+                    </Label>
+                    <Input
+                      id="entry-username-modal"
+                      value={newEntry.username}
+                      onChange={(event) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          username: event.target.value,
+                        }))
+                      }
+                      placeholder="alex@example.com"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="entry-password-modal" className="text-white/80">
+                      Password
+                    </Label>
+                    <Input
+                      id="entry-password-modal"
+                      type="password"
+                      value={newEntry.password}
+                      onChange={(event) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          password: event.target.value,
+                        }))
+                      }
+                      placeholder="Minimum 8 characters"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="entry-url-modal" className="text-white/80">
+                      Website
+                    </Label>
+                    <Input
+                      id="entry-url-modal"
+                      value={newEntry.url}
+                      onChange={(event) =>
+                        setNewEntry((prev) => ({
+                          ...prev,
+                          url: event.target.value,
+                        }))
+                      }
+                      placeholder="https://"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="entry-tags-modal" className="text-white/80">
+                      Tags
+                    </Label>
+                    <Input
+                      id="entry-tags-modal"
+                      value={entryTagsText}
+                      onChange={(event) => setEntryTagsText(event.target.value)}
+                      placeholder="work, finance, shared"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="entry-label-modal" className="text-white/80">
+                        Label
+                      </Label>
+                      <Input
+                        id="entry-label-modal"
+                        value={addLabel}
+                        onChange={(event) => setAddLabel(event.target.value)}
+                        placeholder="e.g. Gmail"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="entry-url-modal" className="text-white/80">
+                        Website
+                      </Label>
+                      <Input
+                        id="entry-url-modal"
+                        value={addWebsite}
+                        onChange={(event) => setAddWebsite(event.target.value)}
+                        placeholder="https://mail.google.com"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="entry-tags-modal" className="text-white/80">
+                        Tags
+                      </Label>
+                      <Input
+                        id="entry-tags-modal"
+                        value={addTagsText}
+                        onChange={(event) => setAddTagsText(event.target.value)}
+                        placeholder="gmail, work, personal"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-[22px] border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">Account rows</p>
+                        <p className="text-xs text-white/55">Add one row per login. Each row becomes a separate saved entry.</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => setAddRows((current) => [...current, createAddAccountRow()])}
+                        className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                      >
+                        <Plus className="mr-2 size-4" />
+                        Add row
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {addRows.map((row, index) => (
+                        <div key={row.id} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                          <div className="space-y-2">
+                            <Label className="text-white/80" htmlFor={`row-username-${row.id}`}>
+                              Username {index + 1}
+                            </Label>
+                            <Input
+                              id={`row-username-${row.id}`}
+                              value={row.username}
+                              onChange={(event) =>
+                                setAddRows((current) =>
+                                  current.map((item) =>
+                                    item.id === row.id ? { ...item, username: event.target.value } : item,
+                                  ),
+                                )
+                              }
+                              placeholder="john@gmail.com"
+                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-white/80" htmlFor={`row-password-${row.id}`}>
+                              Password
+                            </Label>
+                            <Input
+                              id={`row-password-${row.id}`}
+                              type="password"
+                              value={row.password}
+                              onChange={(event) =>
+                                setAddRows((current) =>
+                                  current.map((item) =>
+                                    item.id === row.id ? { ...item, password: event.target.value } : item,
+                                  ),
+                                )
+                              }
+                              placeholder="Minimum 8 characters"
+                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                            />
+                          </div>
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              setAddRows((current) =>
+                                current.length === 1 ? current : current.filter((item) => item.id !== row.id),
+                              )
+                            }
+                            disabled={addRows.length === 1}
+                            className="h-11 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 disabled:opacity-50"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               <Button
-                onClick={handleAddEntry}
+                onClick={handleSaveEntry}
                 disabled={isBusy}
-                className="h-11 w-full rounded-2xl bg-linear-to-r from-emerald-400 to-teal-500 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(16,185,129,0.28)] hover:from-emerald-300 hover:to-teal-400"
+                className="h-11 w-full rounded-2xl bg-white text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(255,255,255,0.14)] hover:bg-white/90"
               >
-                Save entry
+                {editingEntryId ? "Update entry" : "Save entries"}
               </Button>
             </CardContent>
           </Card>

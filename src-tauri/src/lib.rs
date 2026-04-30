@@ -7,7 +7,7 @@ use tauri::State;
 use vault::security;
 use vault::service;
 use vault::storage;
-use vault::types::{VaultEntryInput, VaultEntrySummary, VaultSession, VaultStatus};
+use vault::types::{VaultBackup, VaultEntry, VaultEntryInput, VaultEntrySummary, VaultSession, VaultStatus};
 
 pub struct AppState {
     session: Mutex<VaultSession>,
@@ -85,6 +85,22 @@ fn add_password(entry: VaultEntryInput, state: State<AppState>) -> Result<VaultE
 }
 
 #[tauri::command]
+fn update_password(
+    id: String,
+    entry: VaultEntryInput,
+    state: State<AppState>,
+) -> Result<VaultEntrySummary, String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    let normalized = security::normalize_entry_input(&entry);
+    security::validate_entry_input(&normalized)?;
+    service::update_entry(&mut session, &id, normalized)
+}
+
+#[tauri::command]
 fn get_passwords(state: State<AppState>) -> Result<Vec<VaultEntrySummary>, String> {
     let session = state
         .session
@@ -105,6 +121,16 @@ fn get_password(id: String, state: State<AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_entry(id: String, state: State<AppState>) -> Result<VaultEntry, String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::get_entry(&session, &id)
+}
+
+#[tauri::command]
 fn delete_password(id: String, state: State<AppState>) -> Result<(), String> {
     let mut session = state
         .session
@@ -112,6 +138,25 @@ fn delete_password(id: String, state: State<AppState>) -> Result<(), String> {
         .map_err(|_| "State lock poisoned.".to_string())?;
     security::ensure_unlocked(&session)?;
     service::delete_entry(&mut session, &id)
+}
+
+#[tauri::command]
+fn export_vault(state: State<AppState>) -> Result<VaultBackup, String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::export_backup(&session)
+}
+
+#[tauri::command]
+fn import_vault(backup: VaultBackup, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    service::import_backup(&mut session, backup)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -126,9 +171,13 @@ pub fn run() {
             lock_vault,
             reset_vault,
             add_password,
+            update_password,
             get_passwords,
             get_password,
+            get_entry,
             delete_password,
+            export_vault,
+            import_vault,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

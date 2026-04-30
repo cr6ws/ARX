@@ -37,12 +37,36 @@ pub fn normalize_entry_input(input: &VaultEntryInput) -> VaultEntryInput {
             .as_ref()
             .map(|value| sanitize_output(value))
             .filter(|value| !value.is_empty()),
+        tags: input
+            .tags
+            .iter()
+            .map(|tag| tag.trim().to_string())
+            .filter(|tag| !tag.is_empty())
+            .collect(),
     }
 }
 
 fn validate_password_strength(password: &str) -> Result<(), String> {
     if password.len() < 8 {
         return Err("Password must be at least 8 characters.".to_string());
+    }
+    let lower = password.to_lowercase();
+    let weak_patterns = [
+        "password",
+        "iloveyou",
+        "qwerty",
+        "asdf",
+        "zxcv",
+        "123456",
+        "admin",
+        "facebook",
+    ];
+    if weak_patterns.iter().any(|pattern| lower.contains(pattern)) {
+        return Err("Password is too weak. Use a less common passphrase.".to_string());
+    }
+    let repeated_chars = lower.chars().collect::<Vec<_>>();
+    if repeated_chars.windows(4).all(|window| window.windows(2).all(|pair| pair[0] == pair[1])) {
+        return Err("Password is too weak. Avoid repeated characters.".to_string());
     }
     Ok(())
 }

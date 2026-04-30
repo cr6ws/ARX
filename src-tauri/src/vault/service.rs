@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::vault::crypto;
 use crate::vault::storage;
 use crate::vault::types::{
-    VaultData, VaultEntry, VaultEntryInput, VaultEntrySummary, VaultFile, VaultSession,
+    VaultBackup, VaultData, VaultEntry, VaultEntryInput, VaultEntrySummary, VaultFile, VaultSession,
 };
 
 const VAULT_VERSION: u8 = 1;
@@ -75,6 +75,7 @@ pub fn add_entry(
         password: input.password,
         url: input.url,
         notes: input.notes,
+        tags: input.tags,
         created_at: now,
         updated_at: now,
     };
@@ -104,6 +105,16 @@ pub fn get_password(session: &VaultSession, id: &str) -> Result<String, String> 
     Ok(entry.password.clone())
 }
 
+pub fn get_entry(session: &VaultSession, id: &str) -> Result<VaultEntry, String> {
+    session
+        .vault_data
+        .entries
+        .iter()
+        .find(|entry| entry.id == id)
+        .cloned()
+        .ok_or_else(|| "Entry not found.".to_string())
+}
+
 pub fn delete_entry(session: &mut VaultSession, id: &str) -> Result<(), String> {
     let before = session.vault_data.entries.len();
     session.vault_data.entries.retain(|entry| entry.id != id);
@@ -111,6 +122,49 @@ pub fn delete_entry(session: &mut VaultSession, id: &str) -> Result<(), String> 
         return Err("Entry not found.".to_string());
     }
     save_session(session)
+}
+
+pub fn update_entry(
+    session: &mut VaultSession,
+    id: &str,
+    input: VaultEntryInput,
+) -> Result<VaultEntrySummary, String> {
+    let updated_entry = session
+        .vault_data
+        .entries
+        .iter_mut()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| "Entry not found.".to_string())?;
+
+    updated_entry.label = input.label;
+    updated_entry.username = input.username;
+    updated_entry.password = input.password;
+    updated_entry.url = input.url;
+    updated_entry.notes = input.notes;
+    updated_entry.tags = input.tags;
+    updated_entry.updated_at = now_epoch();
+
+    let entry = updated_entry.clone();
+
+    save_session(session)?;
+    Ok(VaultEntrySummary::from_entry(&entry))
+}
+
+pub fn export_backup(session: &VaultSession) -> Result<VaultBackup, String> {
+    let path = session
+        .vault_path
+        .as_ref()
+        .ok_or_else(|| "Vault path is missing.".to_string())?;
+    let file = storage::read_vault_file(path)?;
+    Ok(VaultBackup { vault_file: file })
+}
+
+pub fn import_backup(session: &mut VaultSession, backup: VaultBackup) -> Result<(), String> {
+    let path = storage::vault_path()?;
+    storage::write_vault_file(&path, &backup.vault_file)?;
+    session.clear();
+    session.vault_path = Some(path);
+    Ok(())
 }
 
 fn save_session(session: &VaultSession) -> Result<(), String> {
