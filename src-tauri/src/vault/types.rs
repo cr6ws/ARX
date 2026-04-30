@@ -70,6 +70,7 @@ pub struct VaultFile {
 #[serde(rename_all = "camelCase")]
 pub struct VaultStatus {
     pub has_vault: bool,
+    pub is_unlocked: bool,
 }
 
 pub struct VaultSession {

@@ -20,6 +20,14 @@ pub fn read_vault_file(path: &Path) -> Result<VaultFile, String> {
     serde_json::from_slice(&bytes).map_err(|e| e.to_string())
 }
 
+pub fn delete_vault_file() -> Result<(), String> {
+    let path = vault_path()?;
+    if path.exists() {
+        fs::remove_file(path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 pub fn write_vault_file(path: &Path, file: &VaultFile) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;

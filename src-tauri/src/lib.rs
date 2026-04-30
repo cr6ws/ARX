@@ -22,9 +22,14 @@ impl Default for AppState {
 }
 
 #[tauri::command]
-fn vault_status() -> Result<VaultStatus, String> {
+fn vault_status(state: State<AppState>) -> Result<VaultStatus, String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
     Ok(VaultStatus {
         has_vault: storage::vault_exists()?,
+        is_unlocked: session.unlocked,
     })
 }
 
@@ -53,6 +58,17 @@ fn lock_vault(state: State<AppState>) -> Result<(), String> {
         .lock()
         .map_err(|_| "State lock poisoned.".to_string())?;
     session.clear();
+    Ok(())
+}
+
+#[tauri::command]
+fn reset_vault(state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    session.clear();
+    storage::delete_vault_file()?;
     Ok(())
 }
 
@@ -108,6 +124,7 @@ pub fn run() {
             init_vault,
             unlock_vault,
             lock_vault,
+            reset_vault,
             add_password,
             get_passwords,
             get_password,
