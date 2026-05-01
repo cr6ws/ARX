@@ -15,6 +15,7 @@ export type VaultEntrySummary = {
   category: VaultCategory;
   isFavorite: boolean;
   updatedAt: number;
+  deletedAt?: number | null;
 };
 
 export type VaultEntry = {
@@ -29,6 +30,7 @@ export type VaultEntry = {
   isFavorite: boolean;
   createdAt: number;
   updatedAt: number;
+  deletedAt?: number | null;
 };
 
 export type VaultEntryInput = {
@@ -44,6 +46,14 @@ export type VaultEntryInput = {
 
 export type AppTheme = "obsidian" | "midnight-purple" | "frosted-silver";
 
+export type PasswordGeneratorSettings = {
+  length: number;
+  includeUppercase: boolean;
+  includeLowercase: boolean;
+  includeNumbers: boolean;
+  includeSymbols: boolean;
+};
+
 export type VaultSettings = {
   autoLockMinutes: number;
   revealTimeoutSeconds: number;
@@ -51,9 +61,10 @@ export type VaultSettings = {
   defaultSection: SidebarSection;
   compactRows: boolean;
   theme: AppTheme;
+  generator: PasswordGeneratorSettings;
 };
 
-export type SidebarSection = "overview" | "audit" | "passwords" | "settings";
+export type SidebarSection = "overview" | "audit" | "passwords" | "trash" | "settings";
 
 export type AuditStats = {
   totalEntries: number;

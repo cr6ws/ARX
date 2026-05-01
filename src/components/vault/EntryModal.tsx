@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import type { VaultEntryInput } from "../../types/vault";
+import type { PasswordGeneratorSettings, VaultEntryInput } from "../../types/vault";
 
 const EMPTY_ENTRY: VaultEntryInput = {
   label: "",
@@ -24,12 +24,26 @@ type EntryModalProps = {
   initialEntry?: VaultEntryInput;
   initialTags?: string[];
   isBusy: boolean;
+  generatorSettings: PasswordGeneratorSettings;
   onClose: () => void;
   onSave: (entry: VaultEntryInput) => Promise<void> | void;
 };
 
-function generatePassword(length = 20) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*_-";
+function generatePassword(settings: PasswordGeneratorSettings) {
+  const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lowercase = "abcdefghijkmnopqrstuvwxyz";
+  const numbers = "23456789";
+  const symbols = "!@#$%^&*_-";
+  
+  let alphabet = "";
+  if (settings.includeUppercase) alphabet += uppercase;
+  if (settings.includeLowercase) alphabet += lowercase;
+  if (settings.includeNumbers) alphabet += numbers;
+  if (settings.includeSymbols) alphabet += symbols;
+  
+  if (!alphabet) alphabet = lowercase + numbers; // Fallback
+
+  const length = settings.length;
   const values = crypto.getRandomValues(new Uint32Array(length));
   return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
 }
@@ -51,6 +65,7 @@ export function EntryModal({
   initialEntry,
   initialTags,
   isBusy,
+  generatorSettings,
   onClose,
   onSave,
 }: EntryModalProps) {
@@ -73,11 +88,11 @@ export function EntryModal({
     setEntry(
       initialEntry ?? {
         ...EMPTY_ENTRY,
-        password: generatePassword(),
+        password: generatePassword(generatorSettings),
       },
     );
     setTagsText(toTagsText(initialTags ?? initialEntry?.tags ?? []));
-  }, [initialEntry, initialTags, open]);
+  }, [initialEntry, initialTags, open, generatorSettings]);
 
   useEffect(() => {
     if (open) {
@@ -137,22 +152,6 @@ export function EntryModal({
           </div>
         </CardHeader>
         <CardContent className="flex-1 space-y-4 overflow-y-auto px-6 py-6 pr-3">
-          <div className="flex items-center justify-end">
-            <Button
-              variant="outline"
-              onClick={() =>
-                setEntry((current) => ({
-                  ...current,
-                  password: generatePassword(),
-                }))
-              }
-              className="h-10 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-            >
-              <Dice5 className="mr-2 size-4" />
-              Generate password
-            </Button>
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="entry-label-modal" className="text-white/80">
@@ -188,23 +187,38 @@ export function EntryModal({
                 className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="entry-password-modal" className="text-white/80">
                 Password
               </Label>
-              <Input
-                id="entry-password-modal"
-                type="password"
-                value={entry.password}
-                onChange={(event) =>
-                  setEntry((current) => ({
-                    ...current,
-                    password: event.target.value,
-                  }))
-                }
-                placeholder="Minimum 8 characters"
-                className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="entry-password-modal"
+                  type="password"
+                  value={entry.password}
+                  onChange={(event) =>
+                    setEntry((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
+                  }
+                  placeholder="Minimum 8 characters"
+                  className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setEntry((current) => ({
+                      ...current,
+                      password: generatePassword(generatorSettings),
+                    }))
+                  }
+                  className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                  title="Generate strong password"
+                >
+                  <Dice5 className="size-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="entry-url-modal" className="text-white/80">

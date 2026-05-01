@@ -1,9 +1,20 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardCopy, Eye, PencilLine, Plus, Trash2, Star, User, Briefcase, Share2, Wallet, Shield, GripVertical } from "lucide-react";
-import { Reorder, useDragControls, AnimatePresence } from "motion/react";
+import { Reorder, useDragControls, AnimatePresence, motion } from "motion/react";
 
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 import type { VaultEntrySummary } from "../types/vault";
 
 type PasswordsPageProps = {
@@ -112,7 +123,7 @@ const EntryRow = memo(({
       ref={(node: any) => {
         if (node) rowRefs.current[entry.id] = node as unknown as HTMLDivElement;
       }}
-      className={`px-6 py-3 transition-colors duration-200 hover:bg-white/[0.02] cursor-default border-b border-white/5 last:border-0 ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""} ${entry.isFavorite ? "bg-white/[0.03]" : ""}`}
+      className={`px-6 py-3 transition-colors duration-200 hover:bg-white/[0.02] cursor-default border-b border-white/5 last:border-0 select-none ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""} ${entry.isFavorite ? "bg-white/[0.03]" : ""}`}
     >
       <div className={rowClassName}>
         <div 
@@ -166,36 +177,68 @@ const EntryRow = memo(({
           >
             <PencilLine className="size-3.5" />
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => onDelete(entry.id)}
-            disabled={isBusy}
-            className="h-8 w-8 rounded-full border-white/20 bg-white/10 p-0 text-white hover:bg-white/15"
-            aria-label={`Delete ${entry.label}`}
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={isBusy}
+                className="h-8 w-8 rounded-full border-white/20 bg-white/10 p-0 text-white hover:bg-white/15"
+                aria-label={`Delete ${entry.label}`}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="border-white/10 bg-zinc-950/95 text-white backdrop-blur-xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Move to Trash?</AlertDialogTitle>
+                <AlertDialogDescription className="text-white/60">
+                  This item will be moved to the Trash Bin. You can restore it within 30 days before it's permanently deleted.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="border-white/10 bg-white/5 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => onDelete(entry.id)}
+                  variant="destructive"
+                  className="bg-red-500 text-white hover:bg-red-600 border-none"
+                >
+                  Move to Trash
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
-      {revealedEntryId === entry.id && revealedPassword && (
-        <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">Revealed password</p>
-              <p className="mt-2 break-all font-mono text-sm text-white">{revealedPassword}</p>
+      <AnimatePresence>
+        {revealedEntryId === entry.id && revealedPassword && (
+          <motion.div
+            key="reveal-container"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.33, 1, 0.68, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">Revealed password</p>
+                  <p className="mt-2 break-all font-mono text-sm text-white">{revealedPassword}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => onCopyPassword(revealedPassword)}
+                  className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                >
+                  <ClipboardCopy className="mr-2 size-4" />
+                  Copy
+                </Button>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => onCopyPassword(revealedPassword)}
-              className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-            >
-              <ClipboardCopy className="mr-2 size-4" />
-              Copy
-            </Button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Reorder.Item>
   );
 });

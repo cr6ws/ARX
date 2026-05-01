@@ -17,6 +17,8 @@ import {
   Share2,
   Wallet,
   Shield as ShieldIcon,
+  Dice5,
+  Trash2,
 } from "lucide-react";
 import arxLogo from "./assets/ARX.png";
 
@@ -41,6 +43,7 @@ import { PasswordsPage } from "./pages/PasswordsPage";
 import { SecurityAuditPage } from "./pages/SecurityAuditPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SecurityDashboard } from "./components/SecurityDashboard";
+import { TrashPage } from "./pages/TrashPage";
 
 import type {
   SidebarSection,
@@ -69,6 +72,13 @@ const DEFAULT_SETTINGS: VaultSettings = {
   defaultSection: "overview",
   compactRows: false,
   theme: "obsidian",
+  generator: {
+    length: 16,
+    includeUppercase: true,
+    includeLowercase: true,
+    includeNumbers: true,
+    includeSymbols: true,
+  },
 };
 
 type AddAccountRow = {
@@ -89,6 +99,25 @@ function createAddAccountRow(overrides?: Partial<AddAccountRow>) {
   };
 }
 
+function generatePassword(settings: VaultSettings["generator"]) {
+  const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lowercase = "abcdefghijkmnopqrstuvwxyz";
+  const numbers = "23456789";
+  const symbols = "!@#$%^&*_-";
+  
+  let alphabet = "";
+  if (settings.includeUppercase) alphabet += uppercase;
+  if (settings.includeLowercase) alphabet += lowercase;
+  if (settings.includeNumbers) alphabet += numbers;
+  if (settings.includeSymbols) alphabet += symbols;
+  
+  if (!alphabet) alphabet = lowercase + numbers;
+
+  const length = settings.length;
+  const values = crypto.getRandomValues(new Uint32Array(length));
+  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
+}
+
 const navigationItems: Array<{
   icon: typeof LayoutGrid;
   label: string;
@@ -97,6 +126,7 @@ const navigationItems: Array<{
   { icon: LayoutGrid, label: "All Items", section: "overview" },
   { icon: ShieldCheck, label: "Security Audit", section: "audit" },
   { icon: KeyRound, label: "Passwords", section: "passwords" },
+  { icon: Trash2, label: "Trash Bin", section: "trash" },
   { icon: Sparkles, label: "Settings", section: "settings" },
 ];
 
@@ -114,6 +144,7 @@ function App() {
   const [isRecovering, setIsRecovering] = useState(false);
   const [recoveryInput, setRecoveryInput] = useState("");
   const [entries, setEntries] = useState<VaultEntrySummary[]>([]);
+  const [trashEntries, setTrashEntries] = useState<VaultEntrySummary[]>([]);
   const [newEntry, setNewEntry] = useState<VaultEntryInput>(EMPTY_ENTRY);
   const [addLabel, setAddLabel] = useState("");
   const [addWebsite, setAddWebsite] = useState("");
@@ -128,6 +159,7 @@ function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [settings, setSettings] = useState<VaultSettings>(DEFAULT_SETTINGS);
   const [activityTick, setActivityTick] = useState(0);
   const [auditRunId, setAuditRunId] = useState(0);
@@ -137,8 +169,12 @@ function App() {
   const clipboardTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", settings.theme);
-  }, [settings.theme]);
+    if (mode === "unlocked") {
+      document.documentElement.setAttribute("data-theme", settings.theme);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  }, [settings.theme, mode]);
 
   const filteredEntries = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -194,6 +230,8 @@ function App() {
         return "Security Audit";
       case "passwords":
         return "Password Manager";
+      case "trash":
+        return "Trash Bin";
       case "settings":
         return "Settings";
       default:
@@ -260,6 +298,7 @@ function App() {
   useEffect(() => {
     if (mode !== "unlocked") return;
     loadEntries();
+    loadTrashEntries();
   }, [mode]);
 
   useEffect(() => {
@@ -274,6 +313,19 @@ function App() {
     try {
       const data = await invoke<VaultEntrySummary[]>("get_passwords");
       setEntries(sortEntriesByUpdated(data));
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const loadTrashEntries = async () => {
+    setIsBusy(true);
+    setError(null);
+    try {
+      const data = await invoke<VaultEntrySummary[]>("get_trash_passwords");
+      setTrashEntries(sortEntriesByUpdated(data));
     } catch (err) {
       setError(String(err));
     } finally {
@@ -372,6 +424,9 @@ function App() {
     try {
       await invoke("reset_vault");
       setEntries([]);
+      setTrashEntries([]);
+      setMode("setup");
+      setIsRecoveryKeyModalOpen(false);
       setNewEntry(EMPTY_ENTRY);
       setAddLabel("");
       setAddWebsite("");
@@ -469,6 +524,34 @@ function App() {
     try {
       await invoke("delete_password", { id });
       await loadEntries();
+      await loadTrashEntries();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await invoke("restore_password", { id });
+      await loadEntries();
+      await loadTrashEntries();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handlePermanentDelete = async (id: string) => {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await invoke("permanently_delete_password", { id });
+      await loadTrashEntries();
     } catch (err) {
       setError(String(err));
     } finally {
@@ -538,6 +621,21 @@ function App() {
   const confirmResetVault = async () => {
     setIsResetConfirmOpen(false);
     await handleResetVault();
+  };
+
+  const openImportConfirm = () => {
+    setError(null);
+    setIsImportConfirmOpen(true);
+  };
+
+  const closeImportConfirm = () => {
+    if (isBusy) return;
+    setIsImportConfirmOpen(false);
+  };
+
+  const confirmImportBackup = async () => {
+    setIsImportConfirmOpen(false);
+    await handleImportBackup();
   };
 
   const closeAddModal = () => {
@@ -631,6 +729,8 @@ function App() {
         const raw = await readTextFile(selected);
         const backup = JSON.parse(raw) as { vaultFile?: unknown };
         await invoke("import_vault", { backup });
+        
+        // Clear all state immediately to prevent confusion
         setEntries([]);
         setIsAddModalOpen(false);
         setAddLabel("");
@@ -640,13 +740,33 @@ function App() {
         setNewEntry(EMPTY_ENTRY);
         setRevealId(null);
         setRevealedPassword(null);
+        
+        // IMPORTANT: Clear recovery modal state so they don't think 
+        // the "new" recovery key applies to the "old" imported vault
+        setIsRecoveryKeyModalOpen(false);
+        setRecoveryKey(null);
+        
         setMode("locked");
         setSuccess(
-          "Vault imported. Please unlock with the backup's master password.",
+          "Vault imported successfully. Please unlock using the backup's original master password.",
         );
       }
     } catch (err) {
       setError(String(err));
+    }
+  };
+
+  const handleRegenerateRecoveryKey = async () => {
+    setIsBusy(true);
+    setError(null);
+    try {
+      const key = await invoke<string>("regenerate_recovery_key");
+      setRecoveryKey(key);
+      setIsRecoveryKeyModalOpen(true);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsBusy(false);
     }
   };
 
@@ -895,55 +1015,6 @@ function App() {
           </div>
         </StarsBackground>
 
-        {isRecoveryKeyModalOpen && (
-          <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl space-y-6">
-              <div className="space-y-2">
-                <h3 className="text-xl font-semibold text-white">
-                  Your Emergency Recovery Key
-                </h3>
-                <p className="text-sm text-white/60">
-                  If you ever lose your master password, this is the{" "}
-                  <span className="text-white font-bold">ONLY WAY</span> to
-                  recover your data.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center space-y-4">
-                <div
-                  className="p-4 bg-black/40 rounded-xl border border-white/20 font-mono text-xl tracking-wider select-all cursor-pointer hover:bg-black/60 transition-colors text-white"
-                  onClick={() => {
-                    if (recoveryKey) {
-                      navigator.clipboard.writeText(recoveryKey);
-                      setSuccess("Recovery key copied to clipboard!");
-                    }
-                  }}
-                >
-                  {recoveryKey}
-                </div>
-                <p className="text-[10px] uppercase tracking-widest text-white/30">
-                  Click the key to copy. Save it somewhere secure.
-                </p>
-              </div>
-
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/70">
-                <ShieldCheck className="size-5 shrink-0 text-white/40" />
-                <p>
-                  Store this key in a physical safe, a printed document, or a
-                  separate secure location. Without it, your passwords are
-                  unrecoverable if you forget your password.
-                </p>
-              </div>
-
-              <Button
-                className="w-full h-12 rounded-2xl bg-white text-black font-semibold hover:bg-white/90"
-                onClick={() => setIsRecoveryKeyModalOpen(false)}
-              >
-                I have saved my recovery key
-              </Button>
-            </div>
-          </div>
-        )}
       </>
     );
   }
@@ -1177,12 +1248,21 @@ function App() {
                 highlightedEntryId={highlightedEntryId}
               />
             )}
+            {activeSection === "trash" && (
+              <TrashPage
+                entries={trashEntries}
+                isBusy={isBusy}
+                onRestore={handleRestore}
+                onDeleteForever={handlePermanentDelete}
+              />
+            )}
             {activeSection === "settings" && (
               <SettingsPage
                 settings={settings}
                 onSettingsChange={handleSettingsChange}
                 onExportBackup={handleExportBackup}
-                onImportBackup={handleImportBackup}
+                onImportBackup={openImportConfirm}
+                onRegenerateRecoveryKey={handleRegenerateRecoveryKey}
                 onResetVault={openResetConfirm}
               />
             )}
@@ -1324,19 +1404,34 @@ function App() {
                     >
                       Password
                     </Label>
-                    <Input
-                      id="entry-password-modal"
-                      type="password"
-                      value={newEntry.password}
-                      onChange={(e) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          password: e.target.value,
-                        }))
-                      }
-                      placeholder="Minimum 8 characters"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="entry-password-modal"
+                        type="password"
+                        value={newEntry.password}
+                        onChange={(e) =>
+                          setNewEntry((prev) => ({
+                            ...prev,
+                            password: e.target.value,
+                          }))
+                        }
+                        placeholder="Minimum 8 characters"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setNewEntry((prev) => ({
+                            ...prev,
+                            password: generatePassword(settings.generator),
+                          }))
+                        }
+                        className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                        title="Generate strong password"
+                      >
+                        <Dice5 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="entry-url-modal" className="text-white/80">
@@ -1448,22 +1543,40 @@ function App() {
                             >
                               Password
                             </Label>
-                            <Input
-                              id={`row-password-${row.id}`}
-                              type="password"
-                              value={row.password}
-                              onChange={(e) =>
-                                setAddRows((current) =>
-                                  current.map((item) =>
-                                    item.id === row.id
-                                      ? { ...item, password: e.target.value }
-                                      : item,
-                                  ),
-                                )
-                              }
-                              placeholder="Minimum 8 characters"
-                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                            />
+                            <div className="flex gap-2">
+                              <Input
+                                id={`row-password-${row.id}`}
+                                type="password"
+                                value={row.password}
+                                onChange={(e) =>
+                                  setAddRows((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? { ...item, password: e.target.value }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                placeholder="Minimum 8 characters"
+                                className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  setAddRows((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? { ...item, password: generatePassword(settings.generator) }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                                title="Generate strong password"
+                              >
+                                <Dice5 className="size-4" />
+                              </Button>
+                            </div>
                           </div>
                           <Button
                             variant="outline"
@@ -1513,7 +1626,7 @@ function App() {
             </CardHeader>
             <CardContent className="space-y-4 px-6 py-6">
               <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
-                This cannot be undone.
+                This cannot be undone. All passwords on this device will be permanently wiped.
               </div>
               <div className="flex gap-3 sm:justify-end">
                 <Button
@@ -1534,6 +1647,100 @@ function App() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {isImportConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="Close import confirmation dialog"
+            onClick={closeImportConfirm}
+          />
+          <Card className="relative z-10 w-full max-w-md rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)]">
+            <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
+              <CardTitle className="text-xl text-white">Import backup?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 px-6 py-6">
+              <div className="space-y-3">
+                <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+                  This will replace your current vault data.
+                </div>
+                <div className="rounded-[22px] border border-red-500/20 bg-red-500/5 px-4 py-3 text-[13px] text-red-400">
+                  <p className="font-semibold mb-1">Important:</p>
+                  You must have the <span className="font-bold text-red-300 underline">original Master Password</span> or the <span className="font-bold text-red-300 underline">original Recovery Key</span> that belonged to the backup file. Any new keys you just saw will not work for this imported data.
+                </div>
+              </div>
+              <div className="flex gap-3 sm:justify-end">
+                <Button
+                  variant="outline"
+                  onClick={closeImportConfirm}
+                  disabled={isBusy}
+                  className="h-11 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmImportBackup}
+                  disabled={isBusy}
+                  className="h-11 rounded-2xl bg-white text-slate-950 hover:bg-white/90"
+                >
+                  Confirm Import
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isRecoveryKeyModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl space-y-6">
+            <div className="space-y-2">
+              <h3 className="text-xl font-semibold text-white">
+                Your Emergency Recovery Key
+              </h3>
+              <p className="text-sm text-white/60">
+                If you ever lose your master password, this is the{" "}
+                <span className="text-white font-bold">ONLY WAY</span> to
+                recover your data.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center space-y-4">
+              <div
+                className="p-4 bg-black/40 rounded-xl border border-white/20 font-mono text-xl tracking-wider select-all cursor-pointer hover:bg-black/60 transition-colors text-white"
+                onClick={() => {
+                  if (recoveryKey) {
+                    navigator.clipboard.writeText(recoveryKey);
+                    setSuccess("Recovery key copied to clipboard!");
+                  }
+                }}
+              >
+                {recoveryKey}
+              </div>
+              <p className="text-[10px] uppercase tracking-widest text-white/30">
+                Click the key to copy. Save it somewhere secure.
+              </p>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/70">
+              <ShieldCheck className="size-5 shrink-0 text-white/40" />
+              <p>
+                Store this key in a physical safe, a printed document, or a
+                separate secure location. Without it, your passwords are
+                unrecoverable if you forget your password.
+              </p>
+            </div>
+
+            <Button
+              className="w-full h-12 rounded-2xl bg-white text-black font-semibold hover:bg-white/90"
+              onClick={() => setIsRecoveryKeyModalOpen(false)}
+            >
+              I have saved my recovery key
+            </Button>
+          </div>
         </div>
       )}
     </div>

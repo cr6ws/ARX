@@ -66,7 +66,9 @@ fn unlock_vault(master_password: String, state: State<AppState>) -> Result<(), S
         .session
         .lock()
         .map_err(|_| "State lock poisoned.".to_string())?;
-    service::unlock_vault(&mut session, &master_password)
+    service::unlock_vault(&mut session, &master_password)?;
+    let _ = service::cleanup_trash(&mut session);
+    Ok(())
 }
 
 #[tauri::command]
@@ -157,7 +159,6 @@ fn get_entry(id: String, state: State<AppState>) -> Result<VaultEntry, String> {
     security::ensure_unlocked(&session)?;
     service::get_entry(&session, &id)
 }
-
 #[tauri::command]
 fn delete_password(id: String, state: State<AppState>) -> Result<(), String> {
     let mut session = state
@@ -166,6 +167,46 @@ fn delete_password(id: String, state: State<AppState>) -> Result<(), String> {
         .map_err(|_| "State lock poisoned.".to_string())?;
     security::ensure_unlocked(&session)?;
     service::delete_entry(&mut session, &id)
+}
+
+#[tauri::command]
+fn get_trash_passwords(state: State<AppState>) -> Result<Vec<VaultEntrySummary>, String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::list_trash_entries(&session)
+}
+
+#[tauri::command]
+fn restore_password(id: String, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::restore_entry(&mut session, &id)
+}
+
+#[tauri::command]
+fn permanently_delete_password(id: String, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::permanently_delete_entry(&mut session, &id)
+}
+
+#[tauri::command]
+fn regenerate_recovery_key(state: State<AppState>) -> Result<String, String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::regenerate_recovery_key(&mut session)
 }
 
 #[tauri::command]
@@ -230,6 +271,10 @@ pub fn run() {
             change_master_password,
             recover_vault,
             get_audit_stats,
+            get_trash_passwords,
+            restore_password,
+            permanently_delete_password,
+            regenerate_recovery_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

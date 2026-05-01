@@ -46,6 +46,7 @@ pub struct VaultEntry {
     pub is_favorite: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub deleted_at: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -59,6 +60,7 @@ pub struct VaultEntrySummary {
     pub category: VaultCategory,
     pub is_favorite: bool,
     pub updated_at: i64,
+    pub deleted_at: Option<i64>,
 }
 
 impl VaultEntrySummary {
@@ -72,6 +74,7 @@ impl VaultEntrySummary {
             category: entry.category.clone(),
             is_favorite: entry.is_favorite,
             updated_at: entry.updated_at,
+            deleted_at: entry.deleted_at,
         }
     }
 }

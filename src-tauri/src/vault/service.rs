@@ -127,6 +127,7 @@ pub fn add_entry(
         is_favorite: input.is_favorite,
         created_at: now,
         updated_at: now,
+        deleted_at: None,
     };
     session.vault_data.entries.push(entry.clone());
     save_session(session)?;
@@ -138,14 +139,27 @@ pub fn list_entries(session: &VaultSession) -> Result<Vec<VaultEntrySummary>, St
         .vault_data
         .entries
         .iter()
+        .filter(|e| e.deleted_at.is_none())
         .map(VaultEntrySummary::from_entry)
         .collect();
     items.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     Ok(items)
 }
 
+pub fn list_trash_entries(session: &VaultSession) -> Result<Vec<VaultEntrySummary>, String> {
+    let mut items: Vec<VaultEntrySummary> = session
+        .vault_data
+        .entries
+        .iter()
+        .filter(|e| e.deleted_at.is_some())
+        .map(VaultEntrySummary::from_entry)
+        .collect();
+    items.sort_by(|a, b| b.deleted_at.cmp(&a.deleted_at));
+    Ok(items)
+}
+
 pub fn get_audit_stats(session: &VaultSession) -> Result<crate::vault::types::AuditStats, String> {
-    let entries = &session.vault_data.entries;
+    let entries: Vec<&VaultEntry> = session.vault_data.entries.iter().filter(|e| e.deleted_at.is_none()).collect();
     let total_entries = entries.len();
     let mut weak_count = 0;
     let mut medium_count = 0;
@@ -246,12 +260,55 @@ pub fn get_entry(session: &VaultSession, id: &str) -> Result<VaultEntry, String>
 }
 
 pub fn delete_entry(session: &mut VaultSession, id: &str) -> Result<(), String> {
+    let entry = session
+        .vault_data
+        .entries
+        .iter_mut()
+        .find(|e| e.id == id)
+        .ok_or_else(|| "Entry not found.".to_string())?;
+
+    entry.deleted_at = Some(now_epoch());
+    save_session(session)
+}
+
+pub fn restore_entry(session: &mut VaultSession, id: &str) -> Result<(), String> {
+    let entry = session
+        .vault_data
+        .entries
+        .iter_mut()
+        .find(|e| e.id == id)
+        .ok_or_else(|| "Entry not found.".to_string())?;
+
+    entry.deleted_at = None;
+    entry.updated_at = now_epoch();
+    save_session(session)
+}
+
+pub fn permanently_delete_entry(session: &mut VaultSession, id: &str) -> Result<(), String> {
     let before = session.vault_data.entries.len();
     session.vault_data.entries.retain(|entry| entry.id != id);
     if session.vault_data.entries.len() == before {
         return Err("Entry not found.".to_string());
     }
     save_session(session)
+}
+
+pub fn cleanup_trash(session: &mut VaultSession) -> Result<(), String> {
+    let now = now_epoch();
+    let thirty_days_secs = 30 * 24 * 60 * 60;
+    let before = session.vault_data.entries.len();
+    
+    session.vault_data.entries.retain(|e| {
+        match e.deleted_at {
+            Some(deleted_at) => (now - deleted_at) < thirty_days_secs,
+            None => true,
+        }
+    });
+
+    if session.vault_data.entries.len() != before {
+        save_session(session)?;
+    }
+    Ok(())
 }
 
 pub fn update_entry(
@@ -328,6 +385,34 @@ pub fn change_master_password(session: &mut VaultSession, new_password: &str) ->
     Ok(())
 }
 
+pub fn regenerate_recovery_key(session: &mut VaultSession) -> Result<String, String> {
+    let master_key = session
+        .key
+        .as_ref()
+        .ok_or_else(|| "Vault is locked.".to_string())?;
+    let path = session
+        .vault_path
+        .as_ref()
+        .ok_or_else(|| "Vault path is missing.".to_string())?;
+
+    // 1. Generate new recovery key
+    let recovery_key = Uuid::new_v4().to_string().to_uppercase();
+    let recovery_salt = crypto::generate_salt();
+    let recovery_wrapper_key = crypto::derive_key(&recovery_key, &recovery_salt)?;
+    let (recovery_wrapped_key, recovery_nonce) =
+        crypto::encrypt_key(&recovery_wrapper_key, master_key)?;
+
+    // 2. Update vault file
+    let mut file = storage::read_vault_file(path)?;
+    file.recovery_salt_b64 = STANDARD.encode(recovery_salt);
+    file.recovery_wrapped_key_b64 = STANDARD.encode(recovery_wrapped_key);
+    file.recovery_nonce_b64 = STANDARD.encode(recovery_nonce);
+
+    storage::write_vault_file(path, &file)?;
+
+    Ok(recovery_key)
+}
+
 pub fn recover_vault(session: &mut VaultSession, recovery_key: &str) -> Result<(), String> {
     let path = storage::vault_path()?;
     if !path.exists() {
@@ -384,6 +469,9 @@ fn save_session(session: &VaultSession) -> Result<(), String> {
         .ok_or_else(|| "Vault path is missing.".to_string())?;
 
     // We need to re-read the file to preserve password and recovery wrapper keys
+    if !path.exists() {
+        return Err("Vault file missing. Please lock and re-initialize the vault.".to_string());
+    }
     let mut file = storage::read_vault_file(path)?;
 
     // Encrypt data with Master Key
