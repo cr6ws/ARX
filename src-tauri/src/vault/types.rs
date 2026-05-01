@@ -31,6 +31,13 @@ pub struct VaultEntryInput {
     pub is_favorite: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PasswordHistoryEntry {
+    pub password: String,
+    pub changed_at: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultEntry {
@@ -44,6 +51,8 @@ pub struct VaultEntry {
     pub category: VaultCategory,
     #[serde(default)]
     pub is_favorite: bool,
+    #[serde(default)]
+    pub password_history: Vec<PasswordHistoryEntry>,
     pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,

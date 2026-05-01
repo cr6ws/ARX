@@ -125,6 +125,7 @@ pub fn add_entry(
         tags: input.tags,
         category: input.category,
         is_favorite: input.is_favorite,
+        password_history: Vec::new(),
         created_at: now,
         updated_at: now,
         deleted_at: None,
@@ -323,9 +324,19 @@ pub fn update_entry(
         .find(|entry| entry.id == id)
         .ok_or_else(|| "Entry not found.".to_string())?;
 
+    if updated_entry.password != input.password {
+        updated_entry.password_history.push(crate::vault::types::PasswordHistoryEntry {
+            password: updated_entry.password.clone(),
+            changed_at: updated_entry.updated_at,
+        });
+        if updated_entry.password_history.len() > 5 {
+            updated_entry.password_history.remove(0);
+        }
+        updated_entry.password = input.password;
+    }
+    
     updated_entry.label = input.label;
     updated_entry.username = input.username;
-    updated_entry.password = input.password;
     updated_entry.url = input.url;
     updated_entry.notes = input.notes;
     updated_entry.tags = input.tags;

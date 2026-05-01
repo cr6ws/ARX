@@ -18,6 +18,11 @@ export type VaultEntrySummary = {
   deletedAt?: number | null;
 };
 
+export type PasswordHistoryEntry = {
+  password: string;
+  changedAt: number;
+};
+
 export type VaultEntry = {
   id: string;
   label: string;
@@ -28,6 +33,7 @@ export type VaultEntry = {
   tags: string[];
   category: VaultCategory;
   isFavorite: boolean;
+  passwordHistory?: PasswordHistoryEntry[];
   createdAt: number;
   updatedAt: number;
   deletedAt?: number | null;

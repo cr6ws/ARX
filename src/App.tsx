@@ -19,7 +19,9 @@ import {
   Shield as ShieldIcon,
   Dice5,
   Trash2,
+  History,
 } from "lucide-react";
+import { CommandPalette } from "./components/CommandPalette";
 import arxLogo from "./assets/ARX.png";
 
 import {
@@ -52,6 +54,7 @@ import type {
   VaultEntrySummary,
   VaultSettings,
   VaultStatus,
+  PasswordHistoryEntry,
 } from "./types/vault";
 
 const EMPTY_ENTRY: VaultEntryInput = {
@@ -161,6 +164,8 @@ function App() {
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [settings, setSettings] = useState<VaultSettings>(DEFAULT_SETTINGS);
+  const [currentHistory, setCurrentHistory] = useState<PasswordHistoryEntry[]>([]);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [activityTick, setActivityTick] = useState(0);
   const [auditRunId, setAuditRunId] = useState(0);
   const [isAddModalMounted, setIsAddModalMounted] = useState(false);
@@ -657,6 +662,7 @@ function App() {
     try {
       const fullEntry = await invoke<VaultEntry>("get_entry", { id });
       setEditingEntryId(id);
+      setCurrentHistory(fullEntry.passwordHistory ?? []);
       setNewEntry({
         label: fullEntry.label,
         username: fullEntry.username,
@@ -812,6 +818,26 @@ function App() {
       );
     };
   }, [activityTick, handleLock, mode, settings.autoLockMinutes]);
+
+  useEffect(() => {
+    if (mode !== "unlocked") return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const isK = e.key.toLowerCase() === "k";
+      const isSpace = e.key === " ";
+      
+      // Support Ctrl+K or Ctrl+Space (fallback)
+      if ((e.ctrlKey || e.metaKey) && (isK || isSpace)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+
+    // Use capture phase to ensure we catch it first
+    window.addEventListener("keydown", handleGlobalKeyDown, true);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown, true);
+  }, [mode]);
 
   useEffect(() => {
     if (mode === "unlocked") {
@@ -1079,7 +1105,7 @@ function App() {
                   <Input
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search vault..."
+                    placeholder="Search vault (Ctrl + K)..."
                     className="h-11 rounded-full border-white/10 bg-black/25 pl-10 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
                   />
                 </div>
@@ -1405,33 +1431,59 @@ function App() {
                       Password
                     </Label>
                     <div className="flex gap-2">
-                      <Input
-                        id="entry-password-modal"
-                        type="password"
-                        value={newEntry.password}
-                        onChange={(e) =>
-                          setNewEntry((prev) => ({
-                            ...prev,
-                            password: e.target.value,
-                          }))
-                        }
-                        placeholder="Minimum 8 characters"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          setNewEntry((prev) => ({
-                            ...prev,
-                            password: generatePassword(settings.generator),
-                          }))
-                        }
-                        className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-                        title="Generate strong password"
-                      >
-                        <Dice5 className="size-4" />
-                      </Button>
-                    </div>
+                        <Input
+                          id="entry-password-modal"
+                          type="password"
+                          value={newEntry.password}
+                          onChange={(e) =>
+                            setNewEntry((prev) => ({
+                              ...prev,
+                              password: e.target.value,
+                            }))
+                          }
+                          placeholder="Minimum 8 characters"
+                          className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            setNewEntry((prev) => ({
+                              ...prev,
+                              password: generatePassword(settings.generator),
+                            }))
+                          }
+                          className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                          title="Generate password"
+                        >
+                          <Dice5 className="size-4" />
+                        </Button>
+                        {editingEntryId && currentHistory.length > 0 && (
+                          <div className="relative group/history">
+                            <Button
+                              variant="outline"
+                              className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                              title="View History"
+                            >
+                              <History className="size-4" />
+                            </Button>
+                            <div className="absolute right-0 top-full mt-2 w-64 p-3 rounded-2xl border border-white/10 bg-[#1a1f21] shadow-2xl opacity-0 scale-95 pointer-events-none group-hover/history:opacity-100 group-hover/history:scale-100 group-hover/history:pointer-events-auto transition-all duration-200 z-50">
+                              <p className="text-[10px] uppercase tracking-widest text-white/30 font-bold mb-3 px-1">Password History</p>
+                              <div className="space-y-1.5">
+                                {currentHistory.map((h, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => setNewEntry(prev => ({ ...prev, password: h.password }))}
+                                    className="w-full text-left p-2 rounded-xl bg-white/5 border border-white/5 hover:border-white/20 hover:bg-white/10 transition-all group/item"
+                                  >
+                                    <p className="text-xs font-mono text-white/80 truncate">{h.password}</p>
+                                    <p className="text-[9px] text-white/30 mt-0.5">Changed {new Date(h.changedAt * 1000).toLocaleDateString()}</p>
+                                  </button>
+                                )).reverse()}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="entry-url-modal" className="text-white/80">
@@ -1743,6 +1795,16 @@ function App() {
           </div>
         </div>
       )}
+
+      <CommandPalette 
+        open={isCommandPaletteOpen}
+        entries={entries}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelect={(id) => {
+          setIsCommandPaletteOpen(false);
+          handleEditEntry(id);
+        }}
+      />
     </div>
   );
 }

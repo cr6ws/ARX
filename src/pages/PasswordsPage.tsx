@@ -260,12 +260,24 @@ export function PasswordsPage({
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [pulseEntryId, setPulseEntryId] = useState<string | null>(null);
   
-  // Local state for immediate drag feedback
-  const [localEntries, setLocalEntries] = useState(entries);
+  // Ensure favorites are always at the top
+  const sortFavoritesFirst = (list: VaultEntrySummary[]) =>
+    [...list].sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
 
+  // Initialize local entries sorted
+  const [localEntries, setLocalEntries] = useState(() => sortFavoritesFirst(entries));
+
+  // Keep localEntries in sync when entries prop changes (sorted)
   useEffect(() => {
-    setLocalEntries(entries);
+    setLocalEntries(sortFavoritesFirst(entries));
   }, [entries]);
+
+  // Update handleLocalReorder to keep favorites on top after reorder
+  const handleLocalReorder = (newEntries: VaultEntrySummary[]) => {
+    const sorted = sortFavoritesFirst(newEntries);
+    setLocalEntries(sorted);
+    onReorder(sorted);
+  };
 
   const rowClassName = compactRows
     ? "grid grid-cols-[30px_72px_minmax(0,1.05fr)_0.85fr_0.7fr_0.75fr] items-center gap-2 text-center text-[10px] sm:text-xs"
@@ -280,10 +292,6 @@ export function PasswordsPage({
     return () => window.clearTimeout(timer);
   }, [highlightedEntryId]);
 
-  const handleLocalReorder = (newEntries: VaultEntrySummary[]) => {
-    setLocalEntries(newEntries);
-    onReorder(newEntries);
-  };
 
   return (
     <section className="space-y-6">
