@@ -65,7 +65,6 @@ export type VaultSettings = {
   revealTimeoutSeconds: number;
   clipboardClearSeconds: number;
   defaultSection: SidebarSection;
-  compactRows: boolean;
   theme: AppTheme;
   generator: PasswordGeneratorSettings;
 };

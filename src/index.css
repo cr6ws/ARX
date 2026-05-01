@@ -9,18 +9,18 @@
   line-height: 1.5;
   font-weight: 400;
 
-  /* Obsidian (Default Monochrome) */
-  --theme-bg: #0b0f10;
-  --theme-bg-secondary: #101415;
-  --theme-gradient-1: rgba(255, 255, 255, 0.04);
-  --theme-gradient-2: rgba(255, 255, 255, 0.02);
-  --theme-gradient-3: rgba(255, 255, 255, 0.01);
+  /* Obsidian (Pure Dark) */
+  --theme-bg: #030303;
+  --theme-bg-secondary: #080808;
+  --theme-gradient-1: rgba(255, 255, 255, 0.02);
+  --theme-gradient-2: rgba(255, 255, 255, 0.01);
+  --theme-gradient-3: rgba(255, 255, 255, 0.005);
   --theme-accent: 255, 255, 255;
-  --theme-text: #e0e3e5;
-  --theme-text-muted: rgba(255, 255, 255, 0.45);
-  --theme-glass: rgba(255, 255, 255, 0.03);
-  --theme-border: rgba(255, 255, 255, 0.08);
-  --theme-accent-glow: rgba(255, 255, 255, 0.1);
+  --theme-text: #f0f0f0;
+  --theme-text-muted: rgba(255, 255, 255, 0.4);
+  --theme-glass: rgba(255, 255, 255, 0.02);
+  --theme-border: rgba(255, 255, 255, 0.06);
+  --theme-accent-glow: rgba(255, 255, 255, 0.08);
 
   /* Shadcn Variables */
   --background: 0 0% 4.3%;

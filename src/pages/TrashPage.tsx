@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import { RotateCcw, Trash2, User, Briefcase, Share2, Wallet, Shield, AlertCircle } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -24,6 +24,19 @@ type TrashPageProps = {
   onDeleteForever: (id: string) => Promise<void>;
 };
 
+function getEntryHost(entry: VaultEntrySummary) {
+  if (entry.url) {
+    try {
+      return new URL(entry.url).hostname.replace(/^www\./, "");
+    } catch {
+      return entry.url.replace(/^https?:\/\//, "").split("/")[0].replace(/^www\./, "");
+    }
+  }
+
+  const slug = entry.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || entry.label.trim().toLowerCase();
+}
+
 function getEntryInitials(entry: VaultEntrySummary) {
   const source = entry.label.trim() || entry.username.trim() || entry.url?.trim() || "?";
   const words = source
@@ -34,6 +47,33 @@ function getEntryInitials(entry: VaultEntrySummary) {
   const first = words[0]?.[0] ?? source[0] ?? "?";
   const second = words[1]?.[0] ?? words[0]?.[1] ?? source[1] ?? "";
   return `${first}${second}`.toUpperCase().slice(0, 2);
+}
+
+function EntryLogo({ entry }: { entry: VaultEntrySummary }) {
+  const [imageError, setImageError] = useState(false);
+  const host = useMemo(() => getEntryHost(entry), [entry]);
+  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+  const initials = useMemo(() => getEntryInitials(entry), [entry]);
+
+  if (!host || imageError) {
+    return (
+      <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-semibold text-white/40">
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+      <img
+        src={faviconUrl}
+        alt={`${entry.label} logo`}
+        className="size-7 rounded-md object-contain opacity-50 grayscale"
+        loading="lazy"
+        onError={() => setImageError(true)}
+      />
+    </div>
+  );
 }
 
 const TrashEntryRow = memo(({ 
@@ -48,7 +88,6 @@ const TrashEntryRow = memo(({
   isBusy: boolean;
 }) => {
   const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
-  const initials = getEntryInitials(entry);
   
   const daysLeft = entry.deletedAt 
     ? Math.max(0, 30 - Math.floor((Date.now() / 1000 - entry.deletedAt) / (24 * 60 * 60)))
@@ -62,9 +101,7 @@ const TrashEntryRow = memo(({
       className="px-6 py-4 transition-colors duration-200 hover:bg-white/[0.02] border-b border-white/5 last:border-0"
     >
       <div className="grid grid-cols-[48px_minmax(0,1fr)_120px_140px] items-center gap-4 text-[13px] sm:text-sm">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-semibold text-white/40">
-          {initials}
-        </div>
+        <EntryLogo entry={entry} />
         
         <div className="min-w-0">
           <p className="truncate font-semibold text-white">{entry.label}</p>

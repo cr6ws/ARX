@@ -73,7 +73,6 @@ const DEFAULT_SETTINGS: VaultSettings = {
   revealTimeoutSeconds: 10,
   clipboardClearSeconds: 15,
   defaultSection: "overview",
-  compactRows: false,
   theme: "obsidian",
   generator: {
     length: 16,
@@ -172,6 +171,7 @@ function App() {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [manualOrder, setManualOrder] = useState<string[]>([]);
   const clipboardTimer = useRef<number | null>(null);
+  const revealTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (mode === "unlocked") {
@@ -568,6 +568,10 @@ function App() {
     if (revealId === id) {
       setRevealId(null);
       setRevealedPassword(null);
+      if (revealTimer.current) {
+        window.clearTimeout(revealTimer.current);
+        revealTimer.current = null;
+      }
       return;
     }
     setIsBusy(true);
@@ -576,6 +580,17 @@ function App() {
       const password = await invoke<string>("get_password", { id });
       setRevealId(id);
       setRevealedPassword(password);
+      
+      if (revealTimer.current) {
+        window.clearTimeout(revealTimer.current);
+      }
+      
+      revealTimer.current = window.setTimeout(() => {
+        setRevealId(null);
+        setRevealedPassword(null);
+        revealTimer.current = null;
+      }, settings.revealTimeoutSeconds * 1000);
+
       if (clipboardTimer.current) {
         window.clearTimeout(clipboardTimer.current);
         clipboardTimer.current = null;
@@ -1269,7 +1284,6 @@ function App() {
                 onCopyPassword={handleCopyPassword}
                 revealedEntryId={revealId}
                 revealedPassword={revealedPassword}
-                compactRows={settings.compactRows}
                 onReorder={handleReorder}
                 highlightedEntryId={highlightedEntryId}
               />

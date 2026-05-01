@@ -27,7 +27,6 @@ type PasswordsPageProps = {
   onCopyPassword: (password: string) => Promise<void> | void;
   revealedEntryId: string | null;
   revealedPassword: string | null;
-  compactRows: boolean;
   highlightedEntryId: string | null;
   onReorder: (newEntries: VaultEntrySummary[]) => void;
 };
@@ -157,7 +156,7 @@ const EntryRow = memo(({
         >
           {entry.username}
         </button>
-        <p className="text-[13px] text-white/70 sm:text-sm">{new Date(entry.updatedAt * 1000).toLocaleDateString()}</p>
+        <p className="text-[13px] text-white/70 sm:text-sm text-center">{new Date(entry.updatedAt * 1000).toLocaleDateString()}</p>
         <div className="flex items-center justify-center gap-1.5">
           <Button
             variant="outline"
@@ -253,7 +252,6 @@ export function PasswordsPage({
   onCopyPassword,
   revealedEntryId,
   revealedPassword,
-  compactRows,
   highlightedEntryId,
   onReorder,
 }: PasswordsPageProps) {
@@ -279,9 +277,7 @@ export function PasswordsPage({
     onReorder(sorted);
   };
 
-  const rowClassName = compactRows
-    ? "grid grid-cols-[30px_72px_minmax(0,1.05fr)_0.85fr_0.7fr_0.75fr] items-center gap-2 text-center text-[10px] sm:text-xs"
-    : "grid grid-cols-[30px_76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] items-center gap-3 text-center text-[11px] sm:text-xs";
+  const rowClassName = "grid grid-cols-[30px_76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] items-center gap-3 text-center text-[11px] sm:text-xs";
 
   useEffect(() => {
     if (!highlightedEntryId) return;
@@ -314,7 +310,7 @@ export function PasswordsPage({
             </div>
           ) : (
             <div className="overflow-hidden">
-              <div className="grid grid-cols-[30px_76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] border-b border-white/10 px-6 py-3 text-center text-[10px] uppercase tracking-[0.26em] text-white/45 sm:text-[11px]">
+              <div className="grid grid-cols-[30px_76px_minmax(0,1.1fr)_0.9fr_0.75fr_0.8fr] items-center gap-3 border-b border-white/10 px-6 py-3 text-center text-[10px] uppercase tracking-[0.26em] text-white/45 sm:text-[11px]">
                 <span></span>
                 <span>Icon</span>
                 <span>Label</span>

@@ -72,7 +72,7 @@ export function SettingsPage({
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 space-y-6 px-6 py-8 overflow-y-auto">
+            <CardContent className="flex-1 flex flex-col space-y-6 px-6 py-8 overflow-y-auto">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="auto-lock" className="text-xs uppercase tracking-widest text-white/40">Auto-lock (min)</Label>
@@ -100,34 +100,27 @@ export function SettingsPage({
 
               <div className="space-y-2">
                 <Label htmlFor="default-section" className="text-xs uppercase tracking-widest text-white/40">Landing Page</Label>
-                <select
-                  id="default-section"
-                  title="Landing Page"
-                  value={settings.defaultSection}
-                  onChange={(e) => onSettingsChange({ ...settings, defaultSection: e.target.value as SidebarSection })}
-                  className="h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-white/35"
-                >
-                  <option value="overview">All Items</option>
-                  <option value="passwords">Passwords</option>
-                  <option value="audit">Security Audit</option>
-                  <option value="settings">Settings</option>
-                </select>
+                <div className="relative group">
+                  <select
+                    id="default-section"
+                    title="Landing Page"
+                    value={settings.defaultSection}
+                    onChange={(e) => onSettingsChange({ ...settings, defaultSection: e.target.value as SidebarSection })}
+                    className="h-11 w-full appearance-none rounded-2xl border border-white/10 bg-black/40 px-4 text-sm text-white transition-all hover:border-white/20 focus:border-white/40 focus:ring-4 focus:ring-white/5 outline-none cursor-pointer"
+                  >
+                    <option value="overview" className="bg-[#1a1f21] text-white">All Items</option>
+                    <option value="passwords" className="bg-[#1a1f21] text-white">Passwords</option>
+                    <option value="audit" className="bg-[#1a1f21] text-white">Security Audit</option>
+                    <option value="settings" className="bg-[#1a1f21] text-white">Settings</option>
+                  </select>
+                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white/60 transition-colors">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-white">Compact rows</p>
-                  <p className="text-[11px] text-white/40">Denser table layout</p>
-                </div>
-                <input
-                  aria-label="Compact rows"
-                  title="Compact rows"
-                  type="checkbox"
-                  checked={settings.compactRows}
-                  onChange={(e) => onSettingsChange({ ...settings, compactRows: e.target.checked })}
-                  className="size-5 accent-white"
-                />
-              </div>
 
               <div className="space-y-3">
                 <Label className="text-xs uppercase tracking-widest text-white/40">Glass Theme</Label>
@@ -148,17 +141,17 @@ export function SettingsPage({
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-white/10">
+              <div className="pt-6 border-t border-white/10 flex-1 flex flex-col justify-end">
                 <div className="space-y-3">
                   <p className="text-xs uppercase tracking-widest text-white/40 font-semibold">Vault Backup</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={onImportBackup} className="h-11 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">
-                      <Upload className="mr-2 size-4" />
-                      Import
+                  <div className="flex flex-col gap-3">
+                    <Button variant="outline" onClick={onImportBackup} className="h-14 w-full rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10 text-base font-semibold">
+                      <Upload className="mr-3 size-5" />
+                      Import Vault Backup
                     </Button>
-                    <Button variant="outline" onClick={onExportBackup} className="h-11 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">
-                      <Download className="mr-2 size-4" />
-                      Export
+                    <Button variant="outline" onClick={onExportBackup} className="h-14 w-full rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10 text-base font-semibold">
+                      <Download className="mr-3 size-5" />
+                      Export Vault Backup
                     </Button>
                   </div>
                 </div>
