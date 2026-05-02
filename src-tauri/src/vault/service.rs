@@ -162,7 +162,9 @@ pub fn list_trash_entries(session: &VaultSession) -> Result<Vec<VaultEntrySummar
 }
 
 pub fn get_audit_stats(session: &VaultSession) -> Result<crate::vault::types::AuditStats, String> {
-    let entries: Vec<&VaultEntry> = session.vault_data.entries.iter().filter(|e| e.deleted_at.is_none()).collect();
+    let entries: Vec<&VaultEntry> = session.vault_data.entries.iter()
+        .filter(|e| e.deleted_at.is_none() && matches!(e.entry_type, crate::vault::types::VaultEntryType::Login))
+        .collect();
     let total_entries = entries.len();
     let mut weak_count = 0;
     let mut medium_count = 0;

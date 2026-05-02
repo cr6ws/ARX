@@ -145,7 +145,7 @@ export function SecurityAuditPage({ entries, auditRunId: _auditRunId, onFixEntry
 
       // Frontend-only checks (Metadata)
       entries.forEach(entry => {
-        if (!entry.url) {
+        if (entry.entryType === "login" && !entry.url) {
           issues.push({
             id: entry.id,
             title: "Missing Website",

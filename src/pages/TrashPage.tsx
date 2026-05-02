@@ -171,7 +171,7 @@ export function TrashPage({
   onDeleteForever,
 }: TrashPageProps) {
   return (
-    <section className="space-y-6">
+    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
         <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">

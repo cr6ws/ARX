@@ -1,14 +1,25 @@
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { 
-  FileText, 
-  Plus, 
-  Trash2, 
+import {
+  FileText,
+  Plus,
+  Trash2,
   Star,
   Clock
 } from "lucide-react";
 import type { VaultEntrySummary } from "../types/vault";
 import { Badge } from "../components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 
 type SecureNotesPageProps = {
   entries: VaultEntrySummary[];
@@ -18,19 +29,19 @@ type SecureNotesPageProps = {
   onDeleteNote: (id: string) => void;
 };
 
-export function SecureNotesPage({ 
-  entries, 
-  searchTerm, 
-  onAddNote, 
-  onEditNote, 
-  onDeleteNote 
+export function SecureNotesPage({
+  entries,
+  searchTerm,
+  onAddNote,
+  onEditNote,
+  onDeleteNote
 }: SecureNotesPageProps) {
   const notes = entries.filter(e => e.entryType === "note");
-  
+
   const filteredNotes = notes.filter(note => {
     const query = searchTerm.toLowerCase();
-    return note.label.toLowerCase().includes(query) || 
-           note.tags.some(t => t.toLowerCase().includes(query));
+    return note.label.toLowerCase().includes(query) ||
+      note.tags.some(t => t.toLowerCase().includes(query));
   }).sort((a, b) => {
     // Sort favorites first
     if (a.isFavorite && !b.isFavorite) return -1;
@@ -46,7 +57,7 @@ export function SecureNotesPage({
           <h1 className="text-3xl font-bold text-white tracking-tight">Secure Notes</h1>
           <p className="text-white/45 mt-1">Encrypted storage for your sensitive documents and snippets.</p>
         </div>
-        <Button 
+        <Button
           onClick={onAddNote}
           className="rounded-full px-8 h-12 bg-white text-black hover:scale-105 transition-transform font-semibold shadow-xl"
         >
@@ -66,7 +77,7 @@ export function SecureNotesPage({
                 {searchTerm ? "No results found" : "No Secure Notes"}
               </h3>
               <p className="text-white/45">
-                {searchTerm 
+                {searchTerm
                   ? `We couldn't find anything matching "${searchTerm}"`
                   : "Store recovery phrases, private keys, or sensitive text here."}
               </p>
@@ -81,7 +92,7 @@ export function SecureNotesPage({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredNotes.map((note) => (
-            <Card 
+            <Card
               key={note.id}
               onClick={() => onEditNote(note.id)}
               className="group relative rounded-[24px] border-white/10 bg-white/5 hover:bg-white/[0.08] transition-all cursor-pointer overflow-hidden p-6"
@@ -91,20 +102,48 @@ export function SecureNotesPage({
                   <FileText className="size-6" />
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="size-8 rounded-full hover:bg-white/10 text-white/40 hover:text-white"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteNote(note.id);
-                    }}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 rounded-full hover:bg-red-500/10 text-white/40 hover:text-red-500 transition-all"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-[32px] border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-bold text-white">Delete Note?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/45 text-base">
+                          Are you sure you want to delete <span className="text-white font-semibold">{note.label}</span>?
+                          This action cannot be undone and you will lose all information stored in this note.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent -mx-0 -mb-0 p-0 sm:justify-end">
+                        <AlertDialogCancel 
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors"
+                        >
+                          Keep Note
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteNote(note.id);
+                          }}
+                          className="rounded-full h-12 px-8 font-semibold transition-all shadow-lg"
+                        >
+                          Delete Forever
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-white truncate">{note.label}</h3>

@@ -4,13 +4,10 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import {
   AlertTriangle,
-  KeyRound,
-  LayoutGrid,
   LockKeyhole,
   Plus,
   Search,
   ShieldCheck,
-  Sparkles,
   Star,
   User,
   Briefcase,
@@ -18,17 +15,15 @@ import {
   Wallet,
   Shield as ShieldIcon,
   Dice5,
-  Trash2,
   History,
   Eye,
   EyeOff,
   GraduationCap,
-  Gamepad2,
-  FileText,
+  Gamepad2
 } from "lucide-react";
 import { CommandPalette } from "./components/CommandPalette";
 import arxLogo from "./assets/ARX.png";
-import arxLightLogo from "./assets/ARX-LIGHT.png";
+import { Sidebar } from "./components/layout/Sidebar";
 
 import {
   decideInitialMode,
@@ -115,13 +110,13 @@ function generatePassword(settings: VaultSettings["generator"]) {
   const lowercase = "abcdefghijkmnopqrstuvwxyz";
   const numbers = "23456789";
   const symbols = "!@#$%^&*_-";
-  
+
   let alphabet = "";
   if (settings.includeUppercase) alphabet += uppercase;
   if (settings.includeLowercase) alphabet += lowercase;
   if (settings.includeNumbers) alphabet += numbers;
   if (settings.includeSymbols) alphabet += symbols;
-  
+
   if (!alphabet) alphabet = lowercase + numbers;
 
   const length = settings.length;
@@ -129,19 +124,6 @@ function generatePassword(settings: VaultSettings["generator"]) {
   return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
 }
 
-const navigationItems: Array<{
-  icon: typeof LayoutGrid;
-  label: string;
-  section: SidebarSection;
-}> = [
-  { icon: LayoutGrid, label: "All Items", section: "overview" },
-  { icon: KeyRound, label: "Passwords", section: "passwords" },
-  { icon: FileText, label: "Secure Notes", section: "notes" },
-  { icon: ShieldCheck, label: "Authenticator", section: "totp" },
-  { icon: Sparkles, label: "Security Audit", section: "audit" },
-  { icon: Trash2, label: "Trash Bin", section: "trash" },
-  { icon: Sparkles, label: "Settings", section: "settings" },
-];
 
 function App() {
   const [mode, setMode] = useState<VaultMode>("loading");
@@ -198,7 +180,7 @@ function App() {
   const filteredEntries = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     let base = entries;
-    
+
     // Apply manual order if it exists
     if (manualOrder.length > 0) {
       const orderMap = new Map(manualOrder.map((id, index) => [id, index]));
@@ -660,11 +642,11 @@ function App() {
       const password = await invoke<string>("get_password", { id });
       setRevealId(id);
       setRevealedPassword(password);
-      
+
       if (revealTimer.current) {
         window.clearTimeout(revealTimer.current);
       }
-      
+
       revealTimer.current = window.setTimeout(() => {
         setRevealId(null);
         setRevealedPassword(null);
@@ -834,7 +816,7 @@ function App() {
         const raw = await readTextFile(selected);
         const backup = JSON.parse(raw) as { vaultFile?: unknown };
         await invoke("import_vault", { backup });
-        
+
         // Clear all state immediately to prevent confusion
         setEntries([]);
         setIsAddModalOpen(false);
@@ -845,12 +827,12 @@ function App() {
         setNewEntry(EMPTY_ENTRY);
         setRevealId(null);
         setRevealedPassword(null);
-        
+
         // IMPORTANT: Clear recovery modal state so they don't think 
         // the "new" recovery key applies to the "old" imported vault
         setIsRecoveryKeyModalOpen(false);
         setRecoveryKey(null);
-        
+
         setMode("locked");
         setSuccess(
           "Vault imported successfully. Please unlock using the backup's original master password.",
@@ -933,7 +915,7 @@ function App() {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const isK = e.key.toLowerCase() === "k";
       const isSpace = e.key === " ";
-      
+
       // Support Ctrl+K or Ctrl+Space (fallback)
       if ((e.ctrlKey || e.metaKey) && (isK || isSpace)) {
         e.preventDefault();
@@ -1165,53 +1147,13 @@ function App() {
   return (
     <div className="min-h-screen text-foreground">
       <div className="mx-auto grid min-h-screen max-w-400 lg:grid-cols-[260px_1fr]">
-        <aside className="border-r border-white/10 bg-black/10 px-4 py-5">
-          <div className="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-            <div className="flex justify-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/80">
-                <img
-                  src={settings.theme === "frosted-silver" ? arxLightLogo : arxLogo}
-                  alt="ARX"
-                  className="size-4 rounded-full object-contain"
-                />
-                ARX
-              </div>
-            </div>
-
-            <nav className="flex flex-1 flex-col gap-2">
-              {navigationItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => setActiveSection(item.section)}
-                    className={
-                      activeSection === item.section
-                        ? "flex items-center gap-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-medium text-white shadow-[0_10px_30px_rgba(255,255,255,0.06)]"
-                        : "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-white/55 transition hover:bg-white/5 hover:text-white/80"
-                    }
-                  >
-                    <Icon className="size-4 shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            <div className="mt-auto space-y-3 border-t border-white/10 pt-4">
-              <Button
-                variant="outline"
-                onClick={handleLock}
-                disabled={isBusy}
-                className="h-11 w-full rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
-              >
-                <LockKeyhole className="mr-2 size-4" />
-                Lock Vault
-              </Button>
-            </div>
-          </div>
-        </aside>
+        <Sidebar
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          onLock={handleLock}
+          isBusy={isBusy}
+          theme={settings.theme}
+        />
 
         <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex h-full flex-col gap-6">
@@ -1279,9 +1221,9 @@ function App() {
             </section>
 
             {activeSection === "overview" && (
-              <section className="space-y-6">
+              <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <SecurityDashboard />
-                
+
                 <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
                   <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
                     <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
@@ -1373,9 +1315,9 @@ function App() {
             )}
 
             {activeSection === "audit" && (
-              <SecurityAuditPage 
-                entries={entries} 
-                auditRunId={auditRunId} 
+              <SecurityAuditPage
+                entries={entries}
+                auditRunId={auditRunId}
                 onFixEntry={handleFixEntry}
               />
             )}
@@ -1413,8 +1355,8 @@ function App() {
               />
             )}
             {activeSection === "notes" && (
-              <SecureNotesPage 
-                entries={entries} 
+              <SecureNotesPage
+                entries={entries}
                 searchTerm={searchTerm}
                 onAddNote={openAddNoteModal}
                 onEditNote={handleEditEntry}
@@ -1422,11 +1364,10 @@ function App() {
               />
             )}
             {activeSection === "totp" && (
-              <AuthenticatorPage 
-                entries={entries} 
+              <AuthenticatorPage
+                entries={entries}
                 searchTerm={searchTerm}
                 onAddAuthenticator={openAddAuthenticatorModal}
-                onEditAuthenticator={handleEditEntry}
                 onDeleteAuthenticator={handleDelete}
               />
             )}
@@ -1594,77 +1535,77 @@ function App() {
 
               {newEntry.entryType === "login" && (
                 editingEntryId ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="entry-label-modal"
-                      className="text-white/80"
-                    >
-                      Label
-                    </Label>
-                    <Input
-                      id="entry-label-modal"
-                      value={newEntry.label}
-                      onChange={(e) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          label: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. Dribbble"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="entry-username-modal"
-                      className="text-white/80"
-                    >
-                      Username
-                    </Label>
-                    <Input
-                      id="entry-username-modal"
-                      value={newEntry.username}
-                      onChange={(e) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          username: e.target.value,
-                        }))
-                      }
-                      placeholder="alex@example.com"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="entry-password-modal"
-                      className="text-white/80"
-                    >
-                      Password
-                    </Label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Input
-                          id="entry-password-modal"
-                          type={showModalPassword ? "text" : "password"}
-                          value={newEntry.password}
-                          onChange={(e) =>
-                            setNewEntry((prev) => ({
-                              ...prev,
-                              password: e.target.value,
-                            }))
-                          }
-                          placeholder="Minimum 8 characters"
-                          className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowModalPassword(!showModalPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-                        >
-                          {showModalPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                        </button>
-                      </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="entry-label-modal"
+                        className="text-white/80"
+                      >
+                        Label
+                      </Label>
+                      <Input
+                        id="entry-label-modal"
+                        value={newEntry.label}
+                        onChange={(e) =>
+                          setNewEntry((prev) => ({
+                            ...prev,
+                            label: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g. Dribbble"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="entry-username-modal"
+                        className="text-white/80"
+                      >
+                        Username
+                      </Label>
+                      <Input
+                        id="entry-username-modal"
+                        value={newEntry.username}
+                        onChange={(e) =>
+                          setNewEntry((prev) => ({
+                            ...prev,
+                            username: e.target.value,
+                          }))
+                        }
+                        placeholder="alex@example.com"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="entry-password-modal"
+                        className="text-white/80"
+                      >
+                        Password
+                      </Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Input
+                            id="entry-password-modal"
+                            type={showModalPassword ? "text" : "password"}
+                            value={newEntry.password}
+                            onChange={(e) =>
+                              setNewEntry((prev) => ({
+                                ...prev,
+                                password: e.target.value,
+                              }))
+                            }
+                            placeholder="Minimum 8 characters"
+                            className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowModalPassword(!showModalPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                          >
+                            {showModalPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                          </button>
+                        </div>
                         <Button
                           variant="outline"
                           onClick={() =>
@@ -1705,182 +1646,182 @@ function App() {
                           </div>
                         )}
                       </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="entry-url-modal" className="text-white/80">
-                      Website
-                    </Label>
-                    <Input
-                      id="entry-url-modal"
-                      value={newEntry.url}
-                      onChange={(e) =>
-                        setNewEntry((prev) => ({
-                          ...prev,
-                          url: e.target.value,
-                        }))
-                      }
-                      placeholder="https://"
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="entry-label-modal"
-                        className="text-white/80"
-                      >
-                        Label
-                      </Label>
-                      <Input
-                        id="entry-label-modal"
-                        value={addLabel}
-                        onChange={(e) => setAddLabel(e.target.value)}
-                        placeholder="e.g. Gmail"
-                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                      />
                     </div>
                     <div className="space-y-2">
-                      <Label
-                        htmlFor="entry-url-modal"
-                        className="text-white/80"
-                      >
+                      <Label htmlFor="entry-url-modal" className="text-white/80">
                         Website
                       </Label>
                       <Input
                         id="entry-url-modal"
-                        value={addWebsite}
-                        onChange={(e) => setAddWebsite(e.target.value)}
-                        placeholder="https://mail.google.com"
+                        value={newEntry.url}
+                        onChange={(e) =>
+                          setNewEntry((prev) => ({
+                            ...prev,
+                            url: e.target.value,
+                          }))
+                        }
+                        placeholder="https://"
                         className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                       />
                     </div>
                   </div>
-
-                  <div className="space-y-3 rounded-[22px] border border-white/10 bg-black/20 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-white">
-                        Account rows
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setAddRows((current) => [
-                            ...current,
-                            createAddAccountRow(),
-                          ])
-                        }
-                        className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-                      >
-                        <Plus className="mr-2 size-4" />
-                        Add row
-                      </Button>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="entry-label-modal"
+                          className="text-white/80"
+                        >
+                          Label
+                        </Label>
+                        <Input
+                          id="entry-label-modal"
+                          value={addLabel}
+                          onChange={(e) => setAddLabel(e.target.value)}
+                          placeholder="e.g. Gmail"
+                          className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="entry-url-modal"
+                          className="text-white/80"
+                        >
+                          Website
+                        </Label>
+                        <Input
+                          id="entry-url-modal"
+                          value={addWebsite}
+                          onChange={(e) => setAddWebsite(e.target.value)}
+                          placeholder="https://mail.google.com"
+                          className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-3">
-                      {addRows.map((row, index) => (
-                        <div
-                          key={row.id}
-                          className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+                    <div className="space-y-3 rounded-[22px] border border-white/10 bg-black/20 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-white">
+                          Account rows
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setAddRows((current) => [
+                              ...current,
+                              createAddAccountRow(),
+                            ])
+                          }
+                          className="h-9 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
                         >
-                          <div className="space-y-2">
-                            <Label
-                              className="text-white/80"
-                              htmlFor={`row-username-${row.id}`}
-                            >
-                              Username {index + 1}
-                            </Label>
-                            <Input
-                              id={`row-username-${row.id}`}
-                              value={row.username}
-                              onChange={(e) =>
-                                setAddRows((current) =>
-                                  current.map((item) =>
-                                    item.id === row.id
-                                      ? { ...item, username: e.target.value }
-                                      : item,
-                                  ),
-                                )
-                              }
-                              placeholder="john@gmail.com"
-                              className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label
-                              className="text-white/80"
-                              htmlFor={`row-password-${row.id}`}
-                            >
-                              Password
-                            </Label>
-                            <div className="flex gap-2">
-                              <div className="relative flex-1">
-                                <Input
-                                  id={`row-password-${row.id}`}
-                                  type={showRowPasswords[row.id] ? "text" : "password"}
-                                  value={row.password}
-                                  onChange={(e) =>
-                                    setAddRows((current) =>
-                                      current.map((item) =>
-                                        item.id === row.id
-                                          ? { ...item, password: e.target.value }
-                                          : item,
-                                      ),
-                                    )
-                                  }
-                                  placeholder="Minimum 8 characters"
-                                  className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowRowPasswords(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-                                >
-                                  {showRowPasswords[row.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                                </button>
-                              </div>
-                              <Button
-                                variant="outline"
-                                onClick={() =>
+                          <Plus className="mr-2 size-4" />
+                          Add row
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {addRows.map((row, index) => (
+                          <div
+                            key={row.id}
+                            className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+                          >
+                            <div className="space-y-2">
+                              <Label
+                                className="text-white/80"
+                                htmlFor={`row-username-${row.id}`}
+                              >
+                                Username {index + 1}
+                              </Label>
+                              <Input
+                                id={`row-username-${row.id}`}
+                                value={row.username}
+                                onChange={(e) =>
                                   setAddRows((current) =>
                                     current.map((item) =>
                                       item.id === row.id
-                                        ? { ...item, password: generatePassword(settings.generator) }
+                                        ? { ...item, username: e.target.value }
                                         : item,
                                     ),
                                   )
                                 }
-                                className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-                                title="Generate strong password"
-                              >
-                                <Dice5 className="size-4" />
-                              </Button>
+                                placeholder="john@gmail.com"
+                                className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                              />
                             </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            onClick={() =>
-                              setAddRows((current) =>
-                                current.length === 1
-                                  ? current
-                                  : current.filter(
+                            <div className="space-y-2">
+                              <Label
+                                className="text-white/80"
+                                htmlFor={`row-password-${row.id}`}
+                              >
+                                Password
+                              </Label>
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <Input
+                                    id={`row-password-${row.id}`}
+                                    type={showRowPasswords[row.id] ? "text" : "password"}
+                                    value={row.password}
+                                    onChange={(e) =>
+                                      setAddRows((current) =>
+                                        current.map((item) =>
+                                          item.id === row.id
+                                            ? { ...item, password: e.target.value }
+                                            : item,
+                                        ),
+                                      )
+                                    }
+                                    placeholder="Minimum 8 characters"
+                                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowRowPasswords(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                  >
+                                    {showRowPasswords[row.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                  </button>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  onClick={() =>
+                                    setAddRows((current) =>
+                                      current.map((item) =>
+                                        item.id === row.id
+                                          ? { ...item, password: generatePassword(settings.generator) }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                  className="h-11 w-11 shrink-0 rounded-2xl border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                                  title="Generate strong password"
+                                >
+                                  <Dice5 className="size-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                setAddRows((current) =>
+                                  current.length === 1
+                                    ? current
+                                    : current.filter(
                                       (item) => item.id !== row.id,
                                     ),
-                              )
-                            }
-                            disabled={addRows.length === 1}
-                            className="h-11 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 disabled:opacity-50"
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      ))}
+                                )
+                              }
+                              disabled={addRows.length === 1}
+                              className="h-11 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 disabled:opacity-50"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
                 )
               )}
 
@@ -2042,7 +1983,7 @@ function App() {
         </div>
       )}
 
-      <CommandPalette 
+      <CommandPalette
         open={isCommandPaletteOpen}
         entries={entries}
         onClose={() => setIsCommandPaletteOpen(false)}
