@@ -126,6 +126,7 @@ pub fn add_entry(
         category: input.category,
         is_favorite: input.is_favorite,
         entry_type: input.entry_type,
+        totp_secret: input.totp_secret,
         password_history: Vec::new(),
         created_at: now,
         updated_at: now,
@@ -266,6 +267,39 @@ pub fn get_password(session: &VaultSession, id: &str) -> Result<String, String> 
     Ok(entry.password.clone())
 }
 
+pub fn get_totp_code(session: &VaultSession, id: &str) -> Result<(String, u64), String> {
+    let entry = session
+        .vault_data
+        .entries
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| "Entry not found.".to_string())?;
+
+    let secret_raw = entry.totp_secret.as_ref().ok_or_else(|| "No TOTP secret found.".to_string())?;
+    
+    let totp = if secret_raw.to_lowercase().starts_with("otpauth://") {
+        totp_rs::TOTP::from_url(secret_raw).map_err(|e| format!("Invalid TOTP URL: {}", e))?
+    } else {
+        let secret_str = secret_raw.to_uppercase();
+        let secret = totp_rs::Secret::Encoded(secret_str);
+        let bytes = secret.to_bytes().map_err(|e| format!("Invalid secret key: {}", e))?;
+        totp_rs::TOTP::new(
+            totp_rs::Algorithm::SHA1,
+            6,
+            1,
+            30,
+            bytes,
+            None,
+            "".to_string(),
+        ).map_err(|e| format!("Failed to initialize TOTP: {}", e))?
+    };
+
+    let code = totp.generate_current().map_err(|e| format!("Failed to generate code: {}", e))?;
+    let next_step = totp.next_step_current().map_err(|e| format!("Failed to get next step: {}", e))?;
+    
+    Ok((code, next_step))
+}
+
 pub fn get_entry(session: &VaultSession, id: &str) -> Result<VaultEntry, String> {
     session
         .vault_data
@@ -359,6 +393,7 @@ pub fn update_entry(
     updated_entry.category = input.category;
     updated_entry.is_favorite = input.is_favorite;
     updated_entry.entry_type = input.entry_type;
+    updated_entry.totp_secret = input.totp_secret;
     updated_entry.updated_at = now_epoch();
 
     let entry = updated_entry.clone();

@@ -53,6 +53,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { SecurityDashboard } from "./components/SecurityDashboard";
 import { TrashPage } from "./pages/TrashPage";
 import { SecureNotesPage } from "./pages/SecureNotesPage";
+import { AuthenticatorPage } from "./pages/AuthenticatorPage";
 
 import type {
   SidebarSection,
@@ -134,9 +135,10 @@ const navigationItems: Array<{
   section: SidebarSection;
 }> = [
   { icon: LayoutGrid, label: "All Items", section: "overview" },
-  { icon: ShieldCheck, label: "Security Audit", section: "audit" },
   { icon: KeyRound, label: "Passwords", section: "passwords" },
   { icon: FileText, label: "Secure Notes", section: "notes" },
+  { icon: ShieldCheck, label: "Authenticator", section: "totp" },
+  { icon: Sparkles, label: "Security Audit", section: "audit" },
   { icon: Trash2, label: "Trash Bin", section: "trash" },
   { icon: Sparkles, label: "Settings", section: "settings" },
 ];
@@ -493,6 +495,16 @@ function App() {
     setIsAddModalOpen(true);
   };
 
+  const openAddAuthenticatorModal = () => {
+    setError(null);
+    setEditingEntryId(null);
+    setNewEntry({ ...EMPTY_ENTRY, entryType: "totp" });
+    setAddLabel("");
+    setAddWebsite("");
+    setAddRows([createAddAccountRow()]);
+    setIsAddModalOpen(true);
+  };
+
   const handleSaveEntry = async () => {
     const labelToValidate = editingEntryId ? newEntry.label : addLabel;
     if (!labelToValidate.trim()) {
@@ -525,6 +537,7 @@ function App() {
           category: newEntry.category,
           isFavorite: newEntry.isFavorite,
           entryType: newEntry.entryType,
+          totpSecret: newEntry.totpSecret,
         };
         await invoke("update_password", { id: editingEntryId, entry: payload });
       } else if (newEntry.entryType === "note") {
@@ -539,6 +552,21 @@ function App() {
             category: newEntry.category,
             isFavorite: newEntry.isFavorite,
             entryType: "note",
+          },
+        });
+      } else if (newEntry.entryType === "totp") {
+        await invoke("add_password", {
+          entry: {
+            label: addLabel.trim(),
+            username: newEntry.username.trim(),
+            password: "",
+            url: addWebsite.trim() ? addWebsite.trim() : undefined,
+            notes: newEntry.notes?.trim() ? newEntry.notes.trim() : undefined,
+            tags: [],
+            category: newEntry.category,
+            isFavorite: newEntry.isFavorite,
+            entryType: "totp",
+            totpSecret: newEntry.totpSecret,
           },
         });
       } else {
@@ -1393,6 +1421,15 @@ function App() {
                 onDeleteNote={handleDelete}
               />
             )}
+            {activeSection === "totp" && (
+              <AuthenticatorPage 
+                entries={entries} 
+                searchTerm={searchTerm}
+                onAddAuthenticator={openAddAuthenticatorModal}
+                onEditAuthenticator={handleEditEntry}
+                onDeleteAuthenticator={handleDelete}
+              />
+            )}
           </div>
         </main>
       </div>
@@ -1504,6 +1541,54 @@ function App() {
                     placeholder="e.g. My Recovery Phrase"
                     className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
                   />
+                </div>
+              )}
+              {newEntry.entryType === "totp" && (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="totp-label-modal" className="text-white/80">
+                        Account Name
+                      </Label>
+                      <Input
+                        id="totp-label-modal"
+                        value={editingEntryId ? newEntry.label : addLabel}
+                        onChange={(e) => {
+                          if (editingEntryId) {
+                            setNewEntry(prev => ({ ...prev, label: e.target.value }));
+                          } else {
+                            setAddLabel(e.target.value);
+                          }
+                        }}
+                        placeholder="e.g. Gmail"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="totp-username-modal" className="text-white/80">
+                        Username / Email
+                      </Label>
+                      <Input
+                        id="totp-username-modal"
+                        value={newEntry.username}
+                        onChange={(e) => setNewEntry(prev => ({ ...prev, username: e.target.value }))}
+                        placeholder="alex@example.com"
+                        className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totp-secret-modal" className="text-white/80">
+                      Secret Key / OTP URL
+                    </Label>
+                    <Input
+                      id="totp-secret-modal"
+                      value={newEntry.totpSecret || ""}
+                      onChange={(e) => setNewEntry(prev => ({ ...prev, totpSecret: e.target.value }))}
+                      placeholder="Enter secret key or paste otpauth:// URI"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 font-mono"
+                    />
+                  </div>
                 </div>
               )}
 

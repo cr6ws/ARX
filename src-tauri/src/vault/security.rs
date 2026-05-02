@@ -24,6 +24,16 @@ pub fn validate_entry_input(input: &VaultEntryInput) -> Result<(), String> {
         validate_password_strength(&input.password)?;
     }
 
+    if matches!(input.entry_type, crate::vault::types::VaultEntryType::Totp) {
+        if let Some(secret) = &input.totp_secret {
+            if secret.trim().is_empty() {
+                return Err("Secret key is required for Authenticator.".to_string());
+            }
+        } else {
+            return Err("Secret key is required for Authenticator.".to_string());
+        }
+    }
+
     Ok(())
 }
 
@@ -51,6 +61,7 @@ pub fn normalize_entry_input(input: &VaultEntryInput) -> VaultEntryInput {
         category: input.category.clone(),
         is_favorite: input.is_favorite,
         entry_type: input.entry_type.clone(),
+        totp_secret: input.totp_secret.as_ref().map(|s| s.replace(char::is_whitespace, "")).filter(|s| !s.is_empty()),
     }
 }
 

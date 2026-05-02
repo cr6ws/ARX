@@ -199,6 +199,16 @@ fn get_password(id: String, state: State<AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_totp_code(id: String, state: State<AppState>) -> Result<(String, u64), String> {
+    let session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::get_totp_code(&session, &id)
+}
+
+#[tauri::command]
 fn get_entry(id: String, state: State<AppState>) -> Result<VaultEntry, String> {
     let session = state
         .session
@@ -354,6 +364,7 @@ pub fn run() {
             restore_password,
             permanently_delete_password,
             regenerate_recovery_key,
+            get_totp_code,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

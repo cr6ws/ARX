@@ -17,6 +17,7 @@ const EMPTY_ENTRY: VaultEntryInput = {
   category: "Other",
   isFavorite: false,
   entryType: "login",
+  totpSecret: "",
 };
 
 type EntryModalProps = {
@@ -78,11 +79,13 @@ export function EntryModal({
 
   const title = mode === "edit" ? "Edit Entry" : "Login Details";
   const description = useMemo(
-    () =>
-      mode === "edit"
-        ? "Update the stored password entry while keeping the vault encrypted locally."
-        : "Add a password entry without leaving the page.",
-    [mode],
+    () => {
+      if (mode === "edit") return "Update the stored entry while keeping the vault encrypted locally.";
+      if (entry.entryType === "totp") return "Setup 2FA for your account by entering the secret key.";
+      if (entry.entryType === "note") return "Create a secure note or snippet.";
+      return "Add a password entry without leaving the page.";
+    },
+    [mode, entry.entryType],
   );
 
   useEffect(() => {
@@ -120,6 +123,7 @@ export function EntryModal({
       url: entry.url?.trim() ? entry.url.trim() : undefined,
       notes: entry.notes?.trim() ? entry.notes.trim() : undefined,
       tags: parseTagsText(tagsText),
+      totpSecret: entry.totpSecret?.trim() ? entry.totpSecret.trim() : undefined,
     });
   };
 
@@ -233,7 +237,7 @@ export function EntryModal({
             </div>
             <div className="space-y-2">
               <Label htmlFor="entry-url-modal" className="text-white/80">
-                Website
+                {entry.entryType === "totp" ? "Service Name (Optional)" : "Website"}
               </Label>
               <Input
                 id="entry-url-modal"
@@ -244,10 +248,29 @@ export function EntryModal({
                     url: event.target.value,
                   }))
                 }
-                placeholder="https://"
+                placeholder={entry.entryType === "totp" ? "e.g. Google" : "https://"}
                 className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
               />
             </div>
+            {entry.entryType === "totp" && (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="entry-totp-modal" className="text-white/80">
+                    Secret Key / OTP URL
+                  </Label>
+                  <Input
+                    id="entry-totp-modal"
+                    value={entry.totpSecret ?? ""}
+                    onChange={(event) =>
+                      setEntry((current) => ({
+                        ...current,
+                        totpSecret: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter the secret key or paste otpauth:// URI"
+                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15 font-mono"
+                  />
+                </div>
+            )}
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="entry-tags-modal" className="text-white/80">
                 Tags

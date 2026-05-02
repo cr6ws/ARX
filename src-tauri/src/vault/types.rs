@@ -18,6 +18,7 @@ pub enum VaultCategory {
 pub enum VaultEntryType {
     Login,
     Note,
+    Totp,
 }
 
 impl Default for VaultEntryType {
@@ -46,6 +47,7 @@ pub struct VaultEntryInput {
     pub is_favorite: bool,
     #[serde(default)]
     pub entry_type: VaultEntryType,
+    pub totp_secret: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -70,6 +72,7 @@ pub struct VaultEntry {
     pub is_favorite: bool,
     #[serde(default)]
     pub entry_type: VaultEntryType,
+    pub totp_secret: Option<String>,
     #[serde(default)]
     pub password_history: Vec<PasswordHistoryEntry>,
     pub created_at: i64,
@@ -88,6 +91,7 @@ pub struct VaultEntrySummary {
     pub category: VaultCategory,
     pub is_favorite: bool,
     pub entry_type: VaultEntryType,
+    pub has_totp: bool,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
 }
@@ -103,6 +107,7 @@ impl VaultEntrySummary {
             category: entry.category.clone(),
             is_favorite: entry.is_favorite,
             entry_type: entry.entry_type.clone(),
+            has_totp: entry.totp_secret.is_some(),
             updated_at: entry.updated_at,
             deleted_at: entry.deleted_at,
         }
