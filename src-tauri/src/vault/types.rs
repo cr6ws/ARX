@@ -13,6 +13,19 @@ pub enum VaultCategory {
     Other,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum VaultEntryType {
+    Login,
+    Note,
+}
+
+impl Default for VaultEntryType {
+    fn default() -> Self {
+        VaultEntryType::Login
+    }
+}
+
 impl Default for VaultCategory {
     fn default() -> Self {
         VaultCategory::Other
@@ -31,6 +44,8 @@ pub struct VaultEntryInput {
     pub category: VaultCategory,
     #[serde(default)]
     pub is_favorite: bool,
+    #[serde(default)]
+    pub entry_type: VaultEntryType,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -54,6 +69,8 @@ pub struct VaultEntry {
     #[serde(default)]
     pub is_favorite: bool,
     #[serde(default)]
+    pub entry_type: VaultEntryType,
+    #[serde(default)]
     pub password_history: Vec<PasswordHistoryEntry>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -70,6 +87,7 @@ pub struct VaultEntrySummary {
     pub tags: Vec<String>,
     pub category: VaultCategory,
     pub is_favorite: bool,
+    pub entry_type: VaultEntryType,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
 }
@@ -84,6 +102,7 @@ impl VaultEntrySummary {
             tags: entry.tags.clone(),
             category: entry.category.clone(),
             is_favorite: entry.is_favorite,
+            entry_type: entry.entry_type.clone(),
             updated_at: entry.updated_at,
             deleted_at: entry.deleted_at,
         }

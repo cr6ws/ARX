@@ -16,6 +16,7 @@ const EMPTY_ENTRY: VaultEntryInput = {
   tags: [],
   category: "Other",
   isFavorite: false,
+  entryType: "login",
 };
 
 type EntryModalProps = {

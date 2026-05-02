@@ -5,6 +5,7 @@ export type VaultStatus = {
 };
 
 export type VaultCategory = "Personal" | "Work" | "School" | "Games" | "Social" | "Finance" | "Other";
+export type VaultEntryType = "login" | "note";
 
 export type VaultEntrySummary = {
   id: string;
@@ -14,6 +15,7 @@ export type VaultEntrySummary = {
   tags: string[];
   category: VaultCategory;
   isFavorite: boolean;
+  entryType: VaultEntryType;
   updatedAt: number;
   deletedAt?: number | null;
 };
@@ -33,6 +35,7 @@ export type VaultEntry = {
   tags: string[];
   category: VaultCategory;
   isFavorite: boolean;
+  entryType: VaultEntryType;
   passwordHistory?: PasswordHistoryEntry[];
   createdAt: number;
   updatedAt: number;
@@ -48,6 +51,7 @@ export type VaultEntryInput = {
   tags: string[];
   category: VaultCategory;
   isFavorite: boolean;
+  entryType: VaultEntryType;
 };
 
 export type AppTheme = "obsidian" | "midnight-purple" | "frosted-silver";
@@ -69,7 +73,7 @@ export type VaultSettings = {
   generator: PasswordGeneratorSettings;
 };
 
-export type SidebarSection = "overview" | "audit" | "passwords" | "trash" | "settings";
+export type SidebarSection = "overview" | "audit" | "passwords" | "notes" | "trash" | "settings";
 
 export type AuditStats = {
   totalEntries: number;

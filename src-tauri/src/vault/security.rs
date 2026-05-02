@@ -12,13 +12,18 @@ pub fn validate_entry_input(input: &VaultEntryInput) -> Result<(), String> {
     if input.label.trim().is_empty() {
         return Err("Entry label is required.".to_string());
     }
-    if input.username.trim().is_empty() {
-        return Err("Username is required.".to_string());
+    
+    // Only validate username/password for Login types
+    if matches!(input.entry_type, crate::vault::types::VaultEntryType::Login) {
+        if input.username.trim().is_empty() {
+            return Err("Username is required for logins.".to_string());
+        }
+        if input.password.is_empty() {
+            return Err("Password is required for logins.".to_string());
+        }
+        validate_password_strength(&input.password)?;
     }
-    if input.password.is_empty() {
-        return Err("Password is required.".to_string());
-    }
-    validate_password_strength(&input.password)?;
+
     Ok(())
 }
 
@@ -45,6 +50,7 @@ pub fn normalize_entry_input(input: &VaultEntryInput) -> VaultEntryInput {
             .collect(),
         category: input.category.clone(),
         is_favorite: input.is_favorite,
+        entry_type: input.entry_type.clone(),
     }
 }
 

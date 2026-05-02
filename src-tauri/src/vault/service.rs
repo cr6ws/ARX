@@ -125,6 +125,7 @@ pub fn add_entry(
         tags: input.tags,
         category: input.category,
         is_favorite: input.is_favorite,
+        entry_type: input.entry_type,
         password_history: Vec::new(),
         created_at: now,
         updated_at: now,
@@ -357,6 +358,7 @@ pub fn update_entry(
     updated_entry.tags = input.tags;
     updated_entry.category = input.category;
     updated_entry.is_favorite = input.is_favorite;
+    updated_entry.entry_type = input.entry_type;
     updated_entry.updated_at = now_epoch();
 
     let entry = updated_entry.clone();

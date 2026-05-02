@@ -24,6 +24,7 @@ import {
   EyeOff,
   GraduationCap,
   Gamepad2,
+  FileText,
 } from "lucide-react";
 import { CommandPalette } from "./components/CommandPalette";
 import arxLogo from "./assets/ARX.png";
@@ -51,6 +52,7 @@ import { SecurityAuditPage } from "./pages/SecurityAuditPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SecurityDashboard } from "./components/SecurityDashboard";
 import { TrashPage } from "./pages/TrashPage";
+import { SecureNotesPage } from "./pages/SecureNotesPage";
 
 import type {
   SidebarSection,
@@ -71,6 +73,7 @@ const EMPTY_ENTRY: VaultEntryInput = {
   tags: [],
   category: "Other",
   isFavorite: false,
+  entryType: "login",
 };
 
 const DEFAULT_SETTINGS: VaultSettings = {
@@ -133,6 +136,7 @@ const navigationItems: Array<{
   { icon: LayoutGrid, label: "All Items", section: "overview" },
   { icon: ShieldCheck, label: "Security Audit", section: "audit" },
   { icon: KeyRound, label: "Passwords", section: "passwords" },
+  { icon: FileText, label: "Secure Notes", section: "notes" },
   { icon: Trash2, label: "Trash Bin", section: "trash" },
   { icon: Sparkles, label: "Settings", section: "settings" },
 ];
@@ -255,6 +259,8 @@ function App() {
         return "Security Audit";
       case "passwords":
         return "Password Manager";
+      case "notes":
+        return "Secure Notes";
       case "trash":
         return "Trash Bin";
       case "settings":
@@ -477,6 +483,16 @@ function App() {
     }
   };
 
+  const openAddNoteModal = () => {
+    setError(null);
+    setEditingEntryId(null);
+    setNewEntry({ ...EMPTY_ENTRY, entryType: "note" });
+    setAddLabel("");
+    setAddWebsite("");
+    setAddRows([createAddAccountRow()]);
+    setIsAddModalOpen(true);
+  };
+
   const handleSaveEntry = async () => {
     const labelToValidate = editingEntryId ? newEntry.label : addLabel;
     if (!labelToValidate.trim()) {
@@ -484,7 +500,7 @@ function App() {
       return;
     }
 
-    if (!editingEntryId) {
+    if (!editingEntryId && newEntry.entryType === "login") {
       const validRows = addRows.filter(
         (row) => row.username.trim() && row.password.length >= 8,
       );
@@ -493,8 +509,6 @@ function App() {
         setError("Add at least one username and password row.");
         return;
       }
-      
-      // We will use validRows below in the else block
     }
 
     setIsBusy(true);
@@ -506,11 +520,27 @@ function App() {
           username: newEntry.username.trim(),
           password: newEntry.password,
           url: newEntry.url?.trim() ? newEntry.url.trim() : undefined,
+          notes: newEntry.notes?.trim() ? newEntry.notes.trim() : undefined,
           tags: [],
           category: newEntry.category,
           isFavorite: newEntry.isFavorite,
+          entryType: newEntry.entryType,
         };
         await invoke("update_password", { id: editingEntryId, entry: payload });
+      } else if (newEntry.entryType === "note") {
+        await invoke("add_password", {
+          entry: {
+            label: addLabel.trim(),
+            username: "",
+            password: "",
+            url: undefined,
+            notes: newEntry.notes?.trim() ? newEntry.notes.trim() : undefined,
+            tags: [],
+            category: newEntry.category,
+            isFavorite: newEntry.isFavorite,
+            entryType: "note",
+          },
+        });
       } else {
         const validRows = addRows.filter(
           (row) => row.username.trim() && row.password.length >= 8,
@@ -522,9 +552,11 @@ function App() {
               username: row.username.trim(),
               password: row.password,
               url: addWebsite.trim() ? addWebsite.trim() : undefined,
+              notes: newEntry.notes?.trim() ? newEntry.notes.trim() : undefined,
               tags: [],
               category: newEntry.category,
               isFavorite: newEntry.isFavorite,
+              entryType: "login",
             },
           });
         }
@@ -710,6 +742,7 @@ function App() {
         tags: fullEntry.tags,
         category: fullEntry.category,
         isFavorite: fullEntry.isFavorite,
+        entryType: fullEntry.entryType,
       });
       setIsAddModalOpen(true);
     } catch (err) {
@@ -1351,6 +1384,15 @@ function App() {
                 onResetVault={openResetConfirm}
               />
             )}
+            {activeSection === "notes" && (
+              <SecureNotesPage 
+                entries={entries} 
+                searchTerm={searchTerm}
+                onAddNote={openAddNoteModal}
+                onEditNote={handleEditEntry}
+                onDeleteNote={handleDelete}
+              />
+            )}
           </div>
         </main>
       </div>
@@ -1372,7 +1414,7 @@ function App() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <CardTitle className="text-xl text-white">
-                    {editingEntryId ? "Edit Entry" : "Login Details"}
+                    {editingEntryId ? "Edit Entry" : newEntry.entryType === "note" ? "New Secure Note" : "Login Details"}
                   </CardTitle>
                 </div>
                 <Button
@@ -1444,7 +1486,29 @@ function App() {
                   );
                 })}
               </div>
-              {editingEntryId ? (
+              {newEntry.entryType === "note" && (
+                <div className="space-y-2">
+                  <Label htmlFor="note-label-modal" className="text-white/80">
+                    Note Label
+                  </Label>
+                  <Input
+                    id="note-label-modal"
+                    value={editingEntryId ? newEntry.label : addLabel}
+                    onChange={(e) => {
+                      if (editingEntryId) {
+                        setNewEntry(prev => ({ ...prev, label: e.target.value }));
+                      } else {
+                        setAddLabel(e.target.value);
+                      }
+                    }}
+                    placeholder="e.g. My Recovery Phrase"
+                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                  />
+                </div>
+              )}
+
+              {newEntry.entryType === "login" && (
+                editingEntryId ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label
@@ -1732,7 +1796,23 @@ function App() {
                     </div>
                   </div>
                 </div>
+                )
               )}
+
+              <div className="space-y-2">
+                <Label htmlFor="entry-notes-modal" className="text-white/80">
+                  {newEntry.entryType === "note" ? "Note Content" : "Additional Notes"}
+                </Label>
+                <textarea
+                  id="entry-notes-modal"
+                  value={newEntry.notes}
+                  onChange={(e) =>
+                    setNewEntry((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                  placeholder={newEntry.entryType === "note" ? "Paste your sensitive note content here..." : "Optional details..."}
+                  className={`w-full ${newEntry.entryType === "note" ? "min-h-[300px]" : "min-h-[100px]"} rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all`}
+                />
+              </div>
               <Button
                 onClick={handleSaveEntry}
                 disabled={isBusy}
