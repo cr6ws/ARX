@@ -11,12 +11,22 @@ use vault::types::{VaultBackup, VaultEntry, VaultEntryInput, VaultEntrySummary, 
 
 pub struct AppState {
     session: Mutex<VaultSession>,
+    login_attempts: Mutex<LoginAttempts>,
+}
+
+struct LoginAttempts {
+    count: u32,
+    last_failure: Option<std::time::Instant>,
 }
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
             session: Mutex::new(VaultSession::new()),
+            login_attempts: Mutex::new(LoginAttempts {
+                count: 0,
+                last_failure: None,
+            }),
         }
     }
 }
@@ -61,14 +71,52 @@ fn init_vault(
 }
 
 #[tauri::command]
-fn unlock_vault(master_password: String, state: State<AppState>) -> Result<(), String> {
-    let mut session = state
-        .session
-        .lock()
-        .map_err(|_| "State lock poisoned.".to_string())?;
-    service::unlock_vault(&mut session, &master_password)?;
-    let _ = service::cleanup_trash(&mut session);
-    Ok(())
+async fn unlock_vault(master_password: String, state: State<'_, AppState>) -> Result<(), String> {
+    // 1. Check for brute force lock
+    {
+        let attempts = state.login_attempts.lock().map_err(|_| "State lock poisoned.")?;
+        if let Some(last) = attempts.last_failure {
+            let elapsed = last.elapsed().as_secs();
+            // Exponential backoff: 2^(count-1) seconds, starting after 3 attempts
+            if attempts.count >= 3 {
+                let wait_secs = 2u64.pow(attempts.count - 3).min(3600); // Max 1 hour
+                if elapsed < wait_secs {
+                    return Err(format!("Too many failed attempts. Please wait {} more seconds.", wait_secs - elapsed));
+                }
+            }
+        }
+    }
+
+    let result = {
+        let mut session = state.session.lock().map_err(|_| "State lock poisoned.")?;
+        service::unlock_vault(&mut session, &master_password)
+    };
+
+    match result {
+        Ok(_) => {
+            // Reset attempts on success
+            let mut attempts = state.login_attempts.lock().map_err(|_| "State lock poisoned.")?;
+            attempts.count = 0;
+            attempts.last_failure = None;
+            
+            let mut session = state.session.lock().map_err(|_| "State lock poisoned.")?;
+            let _ = service::cleanup_trash(&mut session);
+            Ok(())
+        }
+        Err(e) => {
+            // Increment attempts on failure
+            {
+                let mut attempts = state.login_attempts.lock().map_err(|_| "State lock poisoned.")?;
+                attempts.count += 1;
+                attempts.last_failure = Some(std::time::Instant::now());
+            }
+            
+            // Artificial delay to prevent timing attacks
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            
+            Err(e)
+        }
+    }
 }
 
 #[tauri::command]
@@ -239,12 +287,43 @@ fn change_master_password(new_password: String, state: State<AppState>) -> Resul
 }
 
 #[tauri::command]
-fn recover_vault(recovery_key: String, state: State<AppState>) -> Result<(), String> {
-    let mut session = state
-        .session
-        .lock()
-        .map_err(|_| "State lock poisoned.".to_string())?;
-    service::recover_vault(&mut session, &recovery_key)
+async fn recover_vault(recovery_key: String, state: State<'_, AppState>) -> Result<(), String> {
+    // 1. Check for brute force lock
+    {
+        let attempts = state.login_attempts.lock().map_err(|_| "State lock poisoned.")?;
+        if let Some(last) = attempts.last_failure {
+            let elapsed = last.elapsed().as_secs();
+            if attempts.count >= 3 {
+                let wait_secs = 2u64.pow(attempts.count - 3).min(3600);
+                if elapsed < wait_secs {
+                    return Err(format!("Too many failed attempts. Please wait {} more seconds.", wait_secs - elapsed));
+                }
+            }
+        }
+    }
+
+    let result = {
+        let mut session = state.session.lock().map_err(|_| "State lock poisoned.")?;
+        service::recover_vault(&mut session, &recovery_key)
+    };
+
+    match result {
+        Ok(_) => {
+            let mut attempts = state.login_attempts.lock().map_err(|_| "State lock poisoned.")?;
+            attempts.count = 0;
+            attempts.last_failure = None;
+            Ok(())
+        }
+        Err(e) => {
+            {
+                let mut attempts = state.login_attempts.lock().map_err(|_| "State lock poisoned.")?;
+                attempts.count += 1;
+                attempts.last_failure = Some(std::time::Instant::now());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            Err(e)
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -619,11 +619,14 @@ function App() {
     await navigator.clipboard.writeText(password);
     if (clipboardTimer.current) {
       window.clearTimeout(clipboardTimer.current);
-    }
-    clipboardTimer.current = window.setTimeout(() => {
-      void navigator.clipboard.writeText("");
       clipboardTimer.current = null;
-    }, settings.clipboardClearSeconds * 1000);
+    }
+    if (settings.clipboardClearSeconds > 0) {
+      clipboardTimer.current = window.setTimeout(() => {
+        void navigator.clipboard.writeText("");
+        clipboardTimer.current = null;
+      }, settings.clipboardClearSeconds * 1000);
+    }
   };
 
   const openAddModal = () => {

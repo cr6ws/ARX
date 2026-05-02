@@ -74,7 +74,7 @@ export function SettingsPage({
               </div>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col space-y-6 px-6 py-8 overflow-y-auto">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="auto-lock" className="text-xs uppercase tracking-widest text-white/40">Auto-lock (min)</Label>
                   <Input
@@ -97,6 +97,17 @@ export function SettingsPage({
                     className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clipboard-clear" className="text-xs uppercase tracking-widest text-white/40">Clipboard (sec)</Label>
+                  <Input
+                    id="clipboard-clear"
+                    type="number"
+                    min={0}
+                    value={settings.clipboardClearSeconds}
+                    onChange={(e) => onSettingsChange({ ...settings, clipboardClearSeconds: Number(e.target.value) || 0 })}
+                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -116,7 +127,7 @@ export function SettingsPage({
                   </select>
                   <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white/60 transition-colors">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 </div>
@@ -132,14 +143,14 @@ export function SettingsPage({
                       onClick={() => onSettingsChange({ ...settings, theme: t })}
                       className={`group relative h-20 overflow-hidden rounded-2xl border transition-all ${settings.theme === t ? "border-white ring-1 ring-white/20" : "border-white/10 bg-white/5 hover:bg-white/10"}`}
                     >
-                      <div 
-                        className="absolute inset-0 opacity-40 transition-opacity group-hover:opacity-60" 
+                      <div
+                        className="absolute inset-0 opacity-40 transition-opacity group-hover:opacity-60"
                         style={{ backgroundColor: t === "obsidian" ? "#18181b" : t === "midnight-purple" ? "#3b0764" : "#e2e8f0" }}
                       />
                       <div className="relative z-10 flex flex-col items-center gap-2">
-                        <div 
-                          className="size-4 rounded-full shadow-lg" 
-                          style={{ 
+                        <div
+                          className="size-4 rounded-full shadow-lg"
+                          style={{
                             backgroundColor: t === "obsidian" ? "#ffffff" : t === "midnight-purple" ? "#a855f7" : "#0f172a",
                             boxShadow: t === "midnight-purple" ? "0 0 12px rgba(168, 85, 247, 0.5)" : t === "frosted-silver" ? "0 0 12px rgba(15, 23, 42, 0.3)" : "none"
                           }}
@@ -232,7 +243,7 @@ export function SettingsPage({
 
               <div className="pt-6 border-t border-white/10 space-y-4">
                 <Label className="text-xs uppercase tracking-widest text-white/40 font-semibold">Password Generator Defaults</Label>
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="gen-length" className="text-sm text-white/70">Length: {settings.generator.length}</Label>
@@ -262,9 +273,9 @@ export function SettingsPage({
                       key={opt.key}
                       onClick={() => onSettingsChange({
                         ...settings,
-                        generator: { 
-                          ...settings.generator, 
-                          [opt.key]: !settings.generator[opt.key as keyof typeof settings.generator] 
+                        generator: {
+                          ...settings.generator,
+                          [opt.key]: !settings.generator[opt.key as keyof typeof settings.generator]
                         }
                       })}
                       className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${settings.generator[opt.key as keyof typeof settings.generator] ? "bg-white/10 border-white/30 text-white" : "bg-white/5 border-white/5 text-white/30"}`}
