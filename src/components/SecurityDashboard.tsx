@@ -30,6 +30,19 @@ export function SecurityDashboard() {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
 
+  const healthScore = (() => {
+    const stored = window.localStorage.getItem("arx-audit-history");
+    if (stored) {
+      try {
+        const history = JSON.parse(stored);
+        if (history && history.length > 0) {
+          return history[0].score;
+        }
+      } catch { /* ignore */ }
+    }
+    return Math.round(strongPercent);
+  })();
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {/* Password Strength Chart */}
@@ -106,8 +119,8 @@ export function SecurityDashboard() {
                 )}
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold tracking-tight text-theme-text">{Math.round(strongPercent)}%</span>
-                <span className="text-[9px] uppercase tracking-[0.2em] text-theme-text-muted font-medium">Safe</span>
+                <span className="text-3xl font-bold tracking-tight text-theme-text">{healthScore}</span>
+                <span className="text-[9px] uppercase tracking-[0.2em] text-theme-text-muted font-medium">Health</span>
               </div>
             </div>
             

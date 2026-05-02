@@ -229,9 +229,21 @@ function App() {
 
   const totalItems = entries.length;
   const vaultHealth = useMemo(() => {
-    if (totalItems === 0) return 0;
-    return Math.min(96, 68 + totalItems * 4);
-  }, [totalItems]);
+    if (entries.length === 0) return 0;
+    const stored = window.localStorage.getItem("arx-audit-history");
+    if (stored) {
+      try {
+        const history = JSON.parse(stored);
+        if (history && history.length > 0) {
+          return history[0].score;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    // Fallback to simple calculation if no audit run yet
+    return Math.min(96, 68 + entries.length * 4);
+  }, [entries.length, auditRunId]);
 
   const progressBucket = useMemo(() => {
     return Math.min(100, Math.max(0, Math.round(vaultHealth / 10) * 10));
@@ -788,6 +800,15 @@ function App() {
     }
   };
 
+  const handleFixEntry = async (id: string) => {
+    const entry = entries.find((e) => e.id === id);
+    if (entry) {
+      setSearchTerm(entry.label);
+      setActiveSection("passwords");
+      await handleEditEntry(id);
+    }
+  };
+
   const handleRegenerateRecoveryKey = async () => {
     setIsBusy(true);
     setError(null);
@@ -1291,7 +1312,11 @@ function App() {
             )}
 
             {activeSection === "audit" && (
-              <SecurityAuditPage entries={entries} auditRunId={auditRunId} />
+              <SecurityAuditPage 
+                entries={entries} 
+                auditRunId={auditRunId} 
+                onFixEntry={handleFixEntry}
+              />
             )}
             {activeSection === "passwords" && (
               <PasswordsPage

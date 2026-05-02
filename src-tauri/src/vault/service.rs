@@ -168,34 +168,45 @@ pub fn get_audit_stats(session: &VaultSession) -> Result<crate::vault::types::Au
     let mut reused_count = 0;
     let mut old_count = 0;
 
+    let mut weak_ids = Vec::new();
+    let mut medium_ids = Vec::new();
+    let mut old_ids = Vec::new();
+    let mut reused_ids = Vec::new();
+
     let mut passwords = std::collections::HashMap::new();
     let now = now_epoch();
     let six_months_secs = 180 * 24 * 60 * 60;
 
-    for entry in entries {
+    for entry in &entries {
         // Strength
         match calculate_strength(&entry.password) {
-            Strength::Weak => weak_count += 1,
-            Strength::Medium => medium_count += 1,
+            Strength::Weak => {
+                weak_count += 1;
+                weak_ids.push(entry.id.clone());
+            }
+            Strength::Medium => {
+                medium_count += 1;
+                medium_ids.push(entry.id.clone());
+            }
             Strength::Strong => strong_count += 1,
         }
 
-        // Reuse
-        let count = passwords.entry(entry.password.clone()).or_insert(0);
-        *count += 1;
+        // Reuse - Store IDs of all entries sharing this password
+        let ids = passwords.entry(entry.password.clone()).or_insert_with(Vec::new);
+        ids.push(entry.id.clone());
 
         // Old
         if now - entry.updated_at > six_months_secs {
             old_count += 1;
+            old_ids.push(entry.id.clone());
         }
     }
 
     // Count how many entries use a reused password
-    // Actually, the user wants "accounts that share the same password".
-    // If 3 accounts share password A, and 2 share password B, that's 5 entries.
-    for (_, count) in passwords {
-        if count > 1 {
-            reused_count += count;
+    for (_, ids) in passwords {
+        if ids.len() > 1 {
+            reused_count += ids.len();
+            reused_ids.extend(ids);
         }
     }
 
@@ -206,6 +217,10 @@ pub fn get_audit_stats(session: &VaultSession) -> Result<crate::vault::types::Au
         strong_count,
         reused_count,
         old_count,
+        weak_ids,
+        medium_ids,
+        reused_ids,
+        old_ids,
     })
 }
 

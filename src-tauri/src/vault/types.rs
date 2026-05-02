@@ -139,6 +139,10 @@ pub struct AuditStats {
     pub strong_count: usize,
     pub reused_count: usize,
     pub old_count: usize,
+    pub weak_ids: Vec<String>,
+    pub medium_ids: Vec<String>,
+    pub reused_ids: Vec<String>,
+    pub old_ids: Vec<String>,
 }
 
 

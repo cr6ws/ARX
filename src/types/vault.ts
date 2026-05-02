@@ -78,5 +78,9 @@ export type AuditStats = {
   strongCount: number;
   reusedCount: number;
   oldCount: number;
+  weakIds: string[];
+  mediumIds: string[];
+  reusedIds: string[];
+  oldIds: string[];
 };
 
