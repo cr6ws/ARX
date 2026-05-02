@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { RotateCcw, Trash2, User, Briefcase, Share2, Wallet, Shield, AlertCircle } from "lucide-react";
+import { RotateCcw, Trash2, User, Briefcase, Share2, Wallet, Shield, AlertCircle, GraduationCap, Gamepad2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
 import { Button } from "../components/ui/button";
@@ -87,7 +87,7 @@ const TrashEntryRow = memo(({
   onDeleteForever: (id: string) => void;
   isBusy: boolean;
 }) => {
-  const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
+  const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "School" ? GraduationCap : entry.category === "Games" ? Gamepad2 : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
   
   const daysLeft = entry.deletedAt 
     ? Math.max(0, 30 - Math.floor((Date.now() / 1000 - entry.deletedAt) / (24 * 60 * 60)))

@@ -4,7 +4,7 @@ export type VaultStatus = {
   hint?: string | null;
 };
 
-export type VaultCategory = "Personal" | "Work" | "Social" | "Finance" | "Other";
+export type VaultCategory = "Personal" | "Work" | "School" | "Games" | "Social" | "Finance" | "Other";
 
 export type VaultEntrySummary = {
   id: string;

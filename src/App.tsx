@@ -20,9 +20,14 @@ import {
   Dice5,
   Trash2,
   History,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  Gamepad2,
 } from "lucide-react";
 import { CommandPalette } from "./components/CommandPalette";
 import arxLogo from "./assets/ARX.png";
+import arxLightLogo from "./assets/ARX-LIGHT.png";
 
 import {
   decideInitialMode,
@@ -170,6 +175,9 @@ function App() {
   const [isAddModalMounted, setIsAddModalMounted] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [manualOrder, setManualOrder] = useState<string[]>([]);
+  const [showMasterPassword, setShowMasterPassword] = useState(false);
+  const [showModalPassword, setShowModalPassword] = useState(false);
+  const [showRowPasswords, setShowRowPasswords] = useState<Record<string, boolean>>({});
   const clipboardTimer = useRef<number | null>(null);
   const revealTimer = useRef<number | null>(null);
 
@@ -879,7 +887,7 @@ function App() {
 
   if (mode === "loading") {
     return (
-      <StarsBackground className="min-h-screen text-white">
+      <StarsBackground className="min-h-screen text-white" starColor="var(--theme-star-color)">
         <div className="flex min-h-screen items-center justify-center px-4 text-white">
           <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
             <CardContent className="flex flex-col items-center gap-6 px-8 py-10 text-center">
@@ -901,7 +909,7 @@ function App() {
   if (mode !== "unlocked") {
     return (
       <>
-        <StarsBackground className="min-h-screen text-white">
+        <StarsBackground className="min-h-screen text-white" starColor="var(--theme-star-color)">
           <div className="flex min-h-screen items-center justify-center px-4 text-white">
             <Card className="w-full max-w-sm border border-white/15 bg-zinc-950/95 shadow-[0_30px_120px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
               <CardContent className="space-y-6 px-8 py-10">
@@ -933,20 +941,29 @@ function App() {
                         ? "New master password"
                         : "Master password"}
                     </Label>
-                    <Input
-                      id="unlock-password"
-                      type="password"
-                      value={masterPassword}
-                      onChange={(event) =>
-                        setMasterPassword(event.target.value)
-                      }
-                      placeholder={
-                        mode === "setup"
-                          ? "Create master password"
-                          : "Enter master password"
-                      }
-                      className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="unlock-password"
+                        type={showMasterPassword ? "text" : "password"}
+                        value={masterPassword}
+                        onChange={(event) =>
+                          setMasterPassword(event.target.value)
+                        }
+                        placeholder={
+                          mode === "setup"
+                            ? "Create master password"
+                            : "Enter master password"
+                        }
+                        className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowMasterPassword(!showMasterPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                      >
+                        {showMasterPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   {mode === "setup" && (
@@ -1065,10 +1082,10 @@ function App() {
       <div className="mx-auto grid min-h-screen max-w-400 lg:grid-cols-[260px_1fr]">
         <aside className="border-r border-white/10 bg-black/10 px-4 py-5">
           <div className="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-            <div className="space-y-1.5">
+            <div className="flex justify-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/80">
                 <img
-                  src={arxLogo}
+                  src={settings.theme === "frosted-silver" ? arxLightLogo : arxLogo}
                   alt="ARX"
                   className="size-4 rounded-full object-contain"
                 />
@@ -1367,29 +1384,33 @@ function App() {
                 </button>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {(
-                  ["Personal", "Work", "Social", "Finance", "Other"] as const
+                  ["Personal", "Work", "School", "Games", "Social", "Finance", "Other"] as const
                 ).map((cat) => {
                   const Icon =
                     cat === "Personal"
                       ? User
                       : cat === "Work"
                         ? Briefcase
-                        : cat === "Social"
-                          ? Share2
-                          : cat === "Finance"
-                            ? Wallet
-                            : ShieldIcon;
+                        : cat === "School"
+                          ? GraduationCap
+                          : cat === "Games"
+                            ? Gamepad2
+                            : cat === "Social"
+                              ? Share2
+                              : cat === "Finance"
+                                ? Wallet
+                                : ShieldIcon;
                   return (
                     <button
                       key={cat}
                       onClick={() =>
                         setNewEntry((prev) => ({ ...prev, category: cat }))
                       }
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium ${newEntry.category === cat ? "bg-white text-slate-950 border-white" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white"}`}
+                      className={`flex flex-1 justify-center items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-xs font-medium ${newEntry.category === cat ? "bg-white text-slate-950 border-white" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white"}`}
                     >
-                      <Icon className="size-4" />
+                      <Icon className="size-3.5" />
                       {cat}
                     </button>
                   );
@@ -1445,9 +1466,10 @@ function App() {
                       Password
                     </Label>
                     <div className="flex gap-2">
+                      <div className="relative flex-1">
                         <Input
                           id="entry-password-modal"
-                          type="password"
+                          type={showModalPassword ? "text" : "password"}
                           value={newEntry.password}
                           onChange={(e) =>
                             setNewEntry((prev) => ({
@@ -1456,8 +1478,16 @@ function App() {
                             }))
                           }
                           placeholder="Minimum 8 characters"
-                          className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
+                          className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowModalPassword(!showModalPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                        >
+                          {showModalPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
                         <Button
                           variant="outline"
                           onClick={() =>
@@ -1610,22 +1640,31 @@ function App() {
                               Password
                             </Label>
                             <div className="flex gap-2">
-                              <Input
-                                id={`row-password-${row.id}`}
-                                type="password"
-                                value={row.password}
-                                onChange={(e) =>
-                                  setAddRows((current) =>
-                                    current.map((item) =>
-                                      item.id === row.id
-                                        ? { ...item, password: e.target.value }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                                placeholder="Minimum 8 characters"
-                                className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35"
-                              />
+                              <div className="relative flex-1">
+                                <Input
+                                  id={`row-password-${row.id}`}
+                                  type={showRowPasswords[row.id] ? "text" : "password"}
+                                  value={row.password}
+                                  onChange={(e) =>
+                                    setAddRows((current) =>
+                                      current.map((item) =>
+                                        item.id === row.id
+                                          ? { ...item, password: e.target.value }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                  placeholder="Minimum 8 characters"
+                                  className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowRowPasswords(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                >
+                                  {showRowPasswords[row.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                </button>
+                              </div>
                               <Button
                                 variant="outline"
                                 onClick={() =>
@@ -1816,7 +1855,11 @@ function App() {
         onClose={() => setIsCommandPaletteOpen(false)}
         onSelect={(id) => {
           setIsCommandPaletteOpen(false);
-          handleEditEntry(id);
+          const entry = entries.find(e => e.id === id);
+          if (entry) {
+            setSearchTerm(entry.label);
+            setActiveSection("passwords");
+          }
         }}
       />
     </div>

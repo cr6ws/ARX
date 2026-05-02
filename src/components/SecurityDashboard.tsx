@@ -38,23 +38,23 @@ export function SecurityDashboard() {
         <CardContent className="p-6 relative">
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-1">
-              <h3 className="text-lg font-medium text-white">Password Security</h3>
-              <p className="text-xs text-white/40">Overall strength distribution</p>
+              <h3 className="text-lg font-medium text-theme-text">Password Security</h3>
+              <p className="text-xs text-theme-text-muted">Overall strength distribution</p>
             </div>
             <div className="size-10 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
-              <ShieldCheck className="size-5 text-white/60" />
+              <ShieldCheck className="size-5 text-theme-text-muted" />
             </div>
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-10">
             <div className="relative size-36 shrink-0">
               <svg className="size-full -rotate-90" viewBox="0 0 100 100">
-                <circle
+                 <circle
                   cx="50"
                   cy="50"
                   r={radius}
                   fill="transparent"
-                  stroke="rgba(255,255,255,0.03)"
+                  stroke="var(--theme-border)"
                   strokeWidth="10"
                 />
                 
@@ -64,12 +64,12 @@ export function SecurityDashboard() {
                     cy="50"
                     r={radius}
                     fill="transparent"
-                    stroke="white"
+                    stroke="rgb(var(--theme-accent))"
                     strokeWidth="10"
                     strokeDasharray={circumference}
                     strokeDashoffset={circumference - (stats.strongCount / totalStrength) * circumference}
                     strokeLinecap="round"
-                    className="transition-all duration-1000 ease-out drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]"
+                    className="transition-all duration-1000 ease-out"
                   />
                 )}
                 
@@ -79,7 +79,7 @@ export function SecurityDashboard() {
                     cy="50"
                     r={radius}
                     fill="transparent"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke="var(--theme-text-muted)"
                     strokeWidth="10"
                     strokeDasharray={circumference}
                     strokeDashoffset={circumference - (stats.mediumCount / totalStrength) * circumference}
@@ -95,7 +95,7 @@ export function SecurityDashboard() {
                     cy="50"
                     r={radius}
                     fill="transparent"
-                    stroke="rgba(255,255,255,0.15)"
+                    stroke="var(--theme-border)"
                     strokeWidth="10"
                     strokeDasharray={circumference}
                     strokeDashoffset={circumference - (stats.weakCount / totalStrength) * circumference}
@@ -106,16 +106,16 @@ export function SecurityDashboard() {
                 )}
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold tracking-tight text-white">{Math.round(strongPercent)}%</span>
-                <span className="text-[9px] uppercase tracking-[0.2em] text-white/30 font-medium">Safe</span>
+                <span className="text-3xl font-bold tracking-tight text-theme-text">{Math.round(strongPercent)}%</span>
+                <span className="text-[9px] uppercase tracking-[0.2em] text-theme-text-muted font-medium">Safe</span>
               </div>
             </div>
             
             <div className="flex-1 w-full space-y-4">
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs uppercase tracking-widest text-white/40">
+                <div className="flex items-center justify-between text-xs uppercase tracking-widest text-theme-text-muted">
                   <span>Strong</span>
-                  <span className="text-white">{stats.strongCount}</span>
+                  <span className="text-theme-text">{stats.strongCount}</span>
                 </div>
                 <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-white rounded-full" style={{ width: `${strongPercent}%` }} />
@@ -123,9 +123,9 @@ export function SecurityDashboard() {
               </div>
               
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs uppercase tracking-widest text-white/40">
+                <div className="flex items-center justify-between text-xs uppercase tracking-widest text-theme-text-muted">
                   <span>Medium</span>
-                  <span className="text-white">{stats.mediumCount}</span>
+                  <span className="text-theme-text">{stats.mediumCount}</span>
                 </div>
                 <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-white/40 rounded-full" style={{ width: `${mediumPercent}%` }} />
@@ -133,9 +133,9 @@ export function SecurityDashboard() {
               </div>
               
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs uppercase tracking-widest text-white/40">
+                <div className="flex items-center justify-between text-xs uppercase tracking-widest text-theme-text-muted">
                   <span>Weak</span>
-                  <span className="text-white">{stats.weakCount}</span>
+                  <span className="text-theme-text">{stats.weakCount}</span>
                 </div>
                 <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-white/10 rounded-full" style={{ width: `${weakPercent}%` }} />
@@ -150,12 +150,12 @@ export function SecurityDashboard() {
       <div className="grid gap-6">
         <Card className={`rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl overflow-hidden transition-all duration-500 ${stats.reusedCount > 0 ? "ring-1 ring-red-500/20" : ""}`}>
           <CardContent className="p-6 flex items-center gap-5">
-            <div className={`flex size-14 shrink-0 items-center justify-center rounded-[20px] ${stats.reusedCount > 0 ? "bg-red-500/10 text-red-400" : "bg-white/5 text-white/20"}`}>
+            <div className={`flex size-14 shrink-0 items-center justify-center rounded-[20px] ${stats.reusedCount > 0 ? "bg-red-500/10 text-red-400" : "bg-white/5 text-theme-text-muted"}`}>
               <ShieldAlert className="size-7" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-white">Reused Passwords</p>
-              <p className="text-sm text-white/50 mt-1 line-clamp-2">
+              <p className="text-base font-semibold text-theme-text">Reused Passwords</p>
+              <p className="text-sm text-theme-text-muted mt-1 line-clamp-2">
                 {stats.reusedCount > 0 
                   ? `${stats.reusedCount} accounts are sharing credentials, increasing breach risk.` 
                   : "Excellent! Every account has a unique password."}
@@ -166,15 +166,15 @@ export function SecurityDashboard() {
             )}
           </CardContent>
         </Card>
-
+ 
         <Card className="rounded-3xl border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl overflow-hidden">
           <CardContent className="p-6 flex items-center gap-5">
-            <div className={`flex size-14 shrink-0 items-center justify-center rounded-[20px] ${stats.oldCount > 0 ? "bg-orange-500/10 text-orange-400" : "bg-white/5 text-white/20"}`}>
+            <div className={`flex size-14 shrink-0 items-center justify-center rounded-[20px] ${stats.oldCount > 0 ? "bg-orange-500/10 text-orange-400" : "bg-white/5 text-theme-text-muted"}`}>
               <Clock className="size-7" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold text-white">Old Passwords</p>
-              <p className="text-sm text-white/50 mt-1 line-clamp-2">
+              <p className="text-base font-semibold text-theme-text">Old Passwords</p>
+              <p className="text-sm text-theme-text-muted mt-1 line-clamp-2">
                 {stats.oldCount > 0 
                   ? `${stats.oldCount} passwords haven't been rotated in over 180 days.` 
                   : "All passwords have been recently updated."}

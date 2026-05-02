@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardCopy, Eye, PencilLine, Plus, Trash2, Star, User, Briefcase, Share2, Wallet, Shield, GripVertical } from "lucide-react";
+import { ClipboardCopy, Eye, PencilLine, Plus, Trash2, Star, User, Briefcase, Share2, Wallet, Shield, GripVertical, GraduationCap, Gamepad2 } from "lucide-react";
 import { Reorder, useDragControls, AnimatePresence, motion } from "motion/react";
 
 import { Button } from "../components/ui/button";
@@ -108,7 +108,7 @@ const EntryRow = memo(({
   rowRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
 }) => {
   const controls = useDragControls();
-  const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
+  const CategoryIcon = entry.category === "Personal" ? User : entry.category === "Work" ? Briefcase : entry.category === "School" ? GraduationCap : entry.category === "Games" ? Gamepad2 : entry.category === "Social" ? Share2 : entry.category === "Finance" ? Wallet : Shield;
 
   return (
     <Reorder.Item

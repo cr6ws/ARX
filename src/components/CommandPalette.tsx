@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Search, Globe, User, Shield, Hash, ArrowRight } from "lucide-react";
+import { Search, Globe, User, Shield, Hash, ArrowRight, GraduationCap, Gamepad2 } from "lucide-react";
 import type { VaultEntrySummary } from "../types/vault";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -97,6 +97,8 @@ export function CommandPalette({ open, entries, onClose, onSelect }: CommandPale
                       index === selectedIndex ? "border-black/10 bg-black/5" : "border-white/10 bg-white/5"
                     }`}>
                       {entry.category === "Work" ? <Shield className="size-4" /> : 
+                       entry.category === "School" ? <GraduationCap className="size-4" /> :
+                       entry.category === "Games" ? <Gamepad2 className="size-4" /> :
                        entry.category === "Social" ? <User className="size-4" /> :
                        entry.category === "Finance" ? <Hash className="size-4" /> :
                        <Globe className="size-4" />}
@@ -110,7 +112,7 @@ export function CommandPalette({ open, entries, onClose, onSelect }: CommandPale
                   </div>
                   {index === selectedIndex && (
                     <div className="flex items-center gap-2 animate-in slide-in-from-right-2 fade-in duration-200">
-                      <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Enter to open</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Enter to search</span>
                       <ArrowRight className="size-4" />
                     </div>
                   )}

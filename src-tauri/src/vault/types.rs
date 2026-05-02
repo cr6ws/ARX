@@ -6,6 +6,8 @@ use zeroize::Zeroize;
 pub enum VaultCategory {
     Personal,
     Work,
+    School,
+    Games,
     Social,
     Finance,
     Other,

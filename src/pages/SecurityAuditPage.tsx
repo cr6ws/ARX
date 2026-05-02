@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, AlertTriangle, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, ShieldCheck, X } from "lucide-react";
 
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -175,15 +175,7 @@ export function SecurityAuditPage({ entries, auditRunId: _auditRunId }: Security
     });
   };
 
-  const exportReport = () => {
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `arx-audit-${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+
 
   return (
     <div className="space-y-6">
@@ -226,10 +218,6 @@ export function SecurityAuditPage({ entries, auditRunId: _auditRunId }: Security
             <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <CardTitle className="text-xl text-white">Latest Results</CardTitle>
-                <Button onClick={exportReport} variant="outline" className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10">
-                  <Download className="mr-2 size-4" />
-                  Export report
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 px-6 py-6">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, Eye, EyeOff } from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -30,6 +30,7 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const [saved, setSaved] = useState(false);
   const [newMasterPassword, setNewMasterPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
   const [changeStatus, setChangeStatus] = useState<string | null>(null);
 
@@ -131,10 +132,21 @@ export function SettingsPage({
                       onClick={() => onSettingsChange({ ...settings, theme: t })}
                       className={`group relative h-20 overflow-hidden rounded-2xl border transition-all ${settings.theme === t ? "border-white ring-1 ring-white/20" : "border-white/10 bg-white/5 hover:bg-white/10"}`}
                     >
-                      <div className={`absolute inset-0 opacity-40 transition-opacity group-hover:opacity-60 ${t === "obsidian" ? "bg-zinc-900" : t === "midnight-purple" ? "bg-purple-950" : "bg-slate-800"}`} />
+                      <div 
+                        className="absolute inset-0 opacity-40 transition-opacity group-hover:opacity-60" 
+                        style={{ backgroundColor: t === "obsidian" ? "#18181b" : t === "midnight-purple" ? "#3b0764" : "#e2e8f0" }}
+                      />
                       <div className="relative z-10 flex flex-col items-center gap-2">
-                        <div className={`size-4 rounded-full shadow-lg ${t === "obsidian" ? "bg-white" : t === "midnight-purple" ? "bg-purple-500 shadow-purple-500/50" : "bg-slate-200 shadow-slate-200/50"}`} />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">{t.split("-")[0]}</span>
+                        <div 
+                          className="size-4 rounded-full shadow-lg" 
+                          style={{ 
+                            backgroundColor: t === "obsidian" ? "#ffffff" : t === "midnight-purple" ? "#a855f7" : "#0f172a",
+                            boxShadow: t === "midnight-purple" ? "0 0 12px rgba(168, 85, 247, 0.5)" : t === "frosted-silver" ? "0 0 12px rgba(15, 23, 42, 0.3)" : "none"
+                          }}
+                        />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                          {t === "frosted-silver" ? "Frosted Light" : t.split("-")[0]}
+                        </span>
                       </div>
                     </button>
                   ))}
@@ -170,14 +182,23 @@ export function SettingsPage({
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="new-master-password" className="text-xs uppercase tracking-widest text-white/40">Change Master Password</Label>
-                  <Input
-                    id="new-master-password"
-                    type="password"
-                    value={newMasterPassword}
-                    onChange={(e) => setNewMasterPassword(e.target.value)}
-                    placeholder="Enter new master password"
-                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="new-master-password"
+                      type={showNewPassword ? "text" : "password"}
+                      value={newMasterPassword}
+                      onChange={(e) => setNewMasterPassword(e.target.value)}
+                      placeholder="Enter new master password"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
                 </div>
                 {changeStatus && (
                   <p className={`text-xs ${changeStatus.includes("success") ? "text-green-400" : "text-red-400"}`}>

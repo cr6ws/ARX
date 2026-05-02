@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dice5, X } from "lucide-react";
+import { Dice5, X, Eye, EyeOff } from "lucide-react";
 
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -71,6 +71,7 @@ export function EntryModal({
 }: EntryModalProps) {
   const [entry, setEntry] = useState<VaultEntryInput>(EMPTY_ENTRY);
   const [tagsText, setTagsText] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isMounted, setIsMounted] = useState(open);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -192,19 +193,28 @@ export function EntryModal({
                 Password
               </Label>
               <div className="flex gap-2">
-                <Input
-                  id="entry-password-modal"
-                  type="password"
-                  value={entry.password}
-                  onChange={(event) =>
-                    setEntry((current) => ({
-                      ...current,
-                      password: event.target.value,
-                    }))
-                  }
-                  placeholder="Minimum 8 characters"
-                  className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
-                />
+                <div className="relative flex-1">
+                  <Input
+                    id="entry-password-modal"
+                    type={showPassword ? "text" : "password"}
+                    value={entry.password}
+                    onChange={(event) =>
+                      setEntry((current) => ({
+                        ...current,
+                        password: event.target.value,
+                      }))
+                    }
+                    placeholder="Minimum 8 characters"
+                    className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
                 <Button
                   variant="outline"
                   onClick={() =>

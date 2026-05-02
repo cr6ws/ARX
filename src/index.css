@@ -21,6 +21,7 @@
   --theme-glass: rgba(255, 255, 255, 0.02);
   --theme-border: rgba(255, 255, 255, 0.06);
   --theme-accent-glow: rgba(255, 255, 255, 0.08);
+  --theme-star-color: #ffffff;
 
   /* Shadcn Variables */
   --background: 0 0% 4.3%;
@@ -58,16 +59,149 @@
 }
 
 [data-theme="frosted-silver"] {
-  --theme-bg: #0d0f12;
-  --theme-bg-secondary: #16191d;
-  --theme-gradient-1: rgba(226, 232, 240, 0.08);
-  --theme-gradient-2: rgba(148, 163, 184, 0.04);
-  --theme-gradient-3: rgba(255, 255, 255, 0.01);
-  --theme-accent: 241, 245, 249;
-  --theme-glass: rgba(255, 255, 255, 0.04);
-  --theme-border: rgba(255, 255, 255, 0.1);
-  --theme-accent-glow: rgba(255, 255, 255, 0.15);
+  color-scheme: light;
+  --theme-bg: #fdfdfd;
+  --theme-bg-secondary: #f0f2f5;
+  --theme-gradient-1: rgba(51, 65, 85, 0.05);
+  --theme-gradient-2: rgba(100, 116, 139, 0.03);
+  --theme-gradient-3: rgba(255, 255, 255, 0.9);
+  --theme-accent: 15, 23, 42; /* Darker primary for light mode */
+  --theme-text: #0f172a;
+  --theme-text-muted: rgba(15, 23, 42, 0.5);
+  --theme-glass: rgba(255, 255, 255, 0.7);
+  --theme-border: rgba(15, 23, 42, 0.08);
+  --theme-accent-glow: rgba(15, 23, 42, 0.05);
+  --theme-star-color: rgba(15, 23, 42, 0.15);
 }
+
+/* Light mode specific button text fix */
+[data-theme="frosted-silver"] button.bg-white {
+  color: #ffffff !important;
+}
+
+[data-theme="frosted-silver"] .text-white\/20,
+[data-theme="frosted-silver"] .text-white\/30,
+[data-theme="frosted-silver"] .text-white\/35,
+[data-theme="frosted-silver"] .text-white\/40,
+[data-theme="frosted-silver"] .text-white\/45,
+[data-theme="frosted-silver"] .text-white\/50,
+[data-theme="frosted-silver"] .text-white\/55,
+[data-theme="frosted-silver"] .text-white\/60,
+[data-theme="frosted-silver"] .text-white\/65,
+[data-theme="frosted-silver"] .text-white\/70,
+[data-theme="frosted-silver"] .text-white\/80 {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="frosted-silver"] .text-white,
+[data-theme="frosted-silver"] .text-slate-950,
+[data-theme="frosted-silver"] .hover\:text-white:hover,
+[data-theme="frosted-silver"] .hover\:text-white\/80:hover,
+[data-theme="frosted-silver"] .group:hover .group-hover\:text-white {
+  color: var(--theme-text) !important;
+}
+
+
+[data-theme="frosted-silver"] .border-white\/5,
+[data-theme="frosted-silver"] .border-white\/10,
+[data-theme="frosted-silver"] .border-white\/15,
+[data-theme="frosted-silver"] .border-white\/20,
+[data-theme="frosted-silver"] .border-white\/35 {
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="frosted-silver"] .bg-black\/40,
+[data-theme="frosted-silver"] .bg-black\/25,
+[data-theme="frosted-silver"] .bg-black\/20,
+[data-theme="frosted-silver"] .bg-black\/15,
+[data-theme="frosted-silver"] .bg-white\/5,
+[data-theme="frosted-silver"] .bg-white\/10,
+[data-theme="frosted-silver"] .bg-white\/15 {
+  background-color: var(--theme-glass) !important;
+}
+
+/* Placeholder and Input text fixes for Light Mode */
+[data-theme="frosted-silver"] input::placeholder,
+[data-theme="frosted-silver"] .placeholder\:text-white\/20::placeholder,
+[data-theme="frosted-silver"] .placeholder\:text-white\/35::placeholder {
+  color: var(--theme-text-muted) !important;
+  opacity: 0.8 !important;
+}
+
+[data-theme="frosted-silver"] input,
+[data-theme="frosted-silver"] textarea {
+  color: var(--theme-text) !important;
+}
+
+
+/* Modal and hardcoded dark background overrides */
+[data-theme="frosted-silver"] .bg-\[\#151a1c\]\/95,
+[data-theme="frosted-silver"] .bg-\[\#151a1c\]\/90,
+[data-theme="frosted-silver"] .bg-zinc-950,
+[data-theme="frosted-silver"] .bg-zinc-950\/95,
+[data-theme="frosted-silver"] .bg-\[\#1a1f21\] {
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+/* Shadow fixes for light mode */
+[data-theme="frosted-silver"] .shadow-\[0_10px_30px_rgba\(255\,255\,255\,0\.06\)\] {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="frosted-silver"] .shadow-\[0_30px_120px_rgba\(0\,0\,0\,0\.7\)\] {
+  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="frosted-silver"] .shadow-\[0_30px_120px_rgba\(0\,0\,0\,0\.55\)\] {
+  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="frosted-silver"] .shadow-\[0_24px_80px_rgba\(0\,0\,0\,0\.35\)\] {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Select dropdown fix for light mode */
+[data-theme="frosted-silver"] select option {
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+/* Accent element overrides for progress bars etc */
+[data-theme="frosted-silver"] .bg-white {
+  background-color: rgb(var(--theme-accent)) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="frosted-silver"] .bg-white\/20,
+[data-theme="frosted-silver"] .bg-white\/30,
+[data-theme="frosted-silver"] .bg-white\/40 {
+  background-color: rgba(var(--theme-accent), 0.1) !important;
+  color: var(--theme-text) !important;
+}
+
+/* History timeline line fix */
+[data-theme="frosted-silver"] .before\:bg-white\/10::before {
+  background-color: var(--theme-border) !important;
+}
+
+/* Fix for buttons that should stay light with dark text */
+[data-theme="frosted-silver"] .bg-white\/5,
+[data-theme="frosted-silver"] .bg-white\/10 {
+  color: var(--theme-text) !important;
+}
+
+/* Command Palette Selected Item Text Fix */
+[data-theme="frosted-silver"] .bg-white .text-slate-900\/60 {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+
+
+
+
+
+
 
 * {
   box-sizing: border-box;
@@ -147,4 +281,10 @@ nav button.bg-white\/10 {
 
 .animate-breach-scan {
   animation: breach-scan 3s infinite linear;
+}
+
+/* Hide native browser password reveal icons to prevent duplicates */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
 }
