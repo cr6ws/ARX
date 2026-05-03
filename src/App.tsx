@@ -19,7 +19,8 @@ import {
   Eye,
   EyeOff,
   GraduationCap,
-  Gamepad2
+  Gamepad2,
+  Menu
 } from "lucide-react";
 import { CommandPalette } from "./components/CommandPalette";
 import arxLogo from "./assets/ARX.png";
@@ -166,6 +167,7 @@ function App() {
   const [showMasterPassword, setShowMasterPassword] = useState(false);
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [showRowPasswords, setShowRowPasswords] = useState<Record<string, boolean>>({});
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const clipboardTimer = useRef<number | null>(null);
   const revealTimer = useRef<number | null>(null);
 
@@ -1153,12 +1155,24 @@ function App() {
           onLock={handleLock}
           isBusy={isBusy}
           theme={settings.theme}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
+
+        {/* Floating Burger Button - Only visible on mobile */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setIsSidebarOpen(true)}
+          className="fixed left-6 top-6 z-40 h-14 w-14 rounded-2xl border-white/10 bg-black/50 text-white backdrop-blur-md hover:bg-white/10 lg:hidden shadow-2xl"
+        >
+          <Menu className="size-7" />
+        </Button>
 
         <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex h-full flex-col gap-6">
-            <header className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-1 items-center gap-3">
+            <header className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:px-5 md:flex-row md:items-center md:justify-between mt-12 lg:mt-0">
+              <div className="flex flex-1 items-center gap-3 min-w-0">
                 <div className="relative w-full max-w-xl">
                   <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/35" />
                   <Input
@@ -1170,11 +1184,11 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex w-full md:w-auto items-center gap-2 md:justify-end">
                 <Button
                   variant="outline"
                   onClick={openAddModal}
-                  className="h-11 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                  className="flex-1 md:flex-none h-11 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
                 >
                   <Plus className="mr-2 size-4" />
                   Add Item
@@ -1183,7 +1197,7 @@ function App() {
                   variant="outline"
                   onClick={handleLock}
                   disabled={isBusy}
-                  className="h-11 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                  className="flex-1 md:flex-none h-11 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
                 >
                   <LockKeyhole className="mr-2 size-4" />
                   Lock
@@ -1375,7 +1389,7 @@ function App() {
         </main>
       </div>
 
-      {isAddModalMounted && (
+        {isAddModalMounted && (
         <div
           className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm sm:items-center transition-opacity duration-200 ease-out ${isAddModalVisible ? "opacity-100" : "opacity-0"}`}
         >
