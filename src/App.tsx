@@ -33,6 +33,16 @@ import {
 } from "./ai/agents/uiAgent";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./components/ui/alert-dialog";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -156,6 +166,7 @@ function App() {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+  const [isLockConfirmOpen, setIsLockConfirmOpen] = useState(false);
   const [settings, setSettings] = useState<VaultSettings>(DEFAULT_SETTINGS);
   const [currentHistory, setCurrentHistory] = useState<PasswordHistoryEntry[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -284,6 +295,18 @@ function App() {
     };
   }, []);
 
+  const refreshVaultStatus = async () => {
+    try {
+      const status = await invoke<VaultStatus>("vault_status");
+      setVaultHint(status.hint ?? null);
+      setMode(
+        status.isUnlocked ? "unlocked" : decideInitialMode(status.hasVault),
+      );
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
   useEffect(() => {
     const stored = window.localStorage.getItem("arx-settings");
     if (!stored) return;
@@ -351,8 +374,8 @@ function App() {
   };
 
   const handleInitVault = async () => {
-    if (masterPassword.length < 8) {
-      setError("Master password must be at least 8 characters.");
+    if (masterPassword.length < 6) {
+      setError("Master password must be at least 6 characters.");
       return;
     }
     setIsBusy(true);
@@ -366,7 +389,7 @@ function App() {
       setMasterPassword("");
       setMasterPasswordHint("");
       setIsRecoveryKeyModalOpen(true);
-      setMode("unlocked");
+      await refreshVaultStatus();
     } catch (err) {
       setError(String(err));
     } finally {
@@ -375,8 +398,8 @@ function App() {
   };
 
   const handleUnlock = async () => {
-    if (masterPassword.length < 8) {
-      setError("Master password must be at least 8 characters.");
+    if (masterPassword.length < 6) {
+      setError("Master password must be at least 6 characters.");
       return;
     }
     setIsBusy(true);
@@ -384,7 +407,7 @@ function App() {
     try {
       await invoke("unlock_vault", { masterPassword });
       setMasterPassword("");
-      setMode("unlocked");
+      await refreshVaultStatus();
     } catch (err) {
       setError(String(err));
     } finally {
@@ -408,7 +431,8 @@ function App() {
         window.clearTimeout(clipboardTimer.current);
         clipboardTimer.current = null;
       }
-      setMode("locked");
+      setShowHint(false);
+      await refreshVaultStatus();
     } catch (err) {
       setError(String(err));
     } finally {
@@ -423,7 +447,7 @@ function App() {
       await invoke("recover_vault", { recoveryKey: recoveryInput.trim() });
       setRecoveryInput("");
       setIsRecovering(false);
-      setMode("unlocked");
+      await refreshVaultStatus();
       setSuccess(
         "Vault recovered successfully! You can now change your master password in Settings.",
       );
@@ -498,7 +522,7 @@ function App() {
 
     if (!editingEntryId && newEntry.entryType === "login") {
       const validRows = addRows.filter(
-        (row) => row.username.trim() && row.password.length >= 8,
+        (row) => row.username.trim() && row.password.length >= 6,
       );
 
       if (validRows.length === 0) {
@@ -555,7 +579,7 @@ function App() {
         });
       } else {
         const validRows = addRows.filter(
-          (row) => row.username.trim() && row.password.length >= 8,
+          (row) => row.username.trim() && row.password.length >= 6,
         );
         for (const row of validRows) {
           await invoke("add_password", {
@@ -700,6 +724,22 @@ function App() {
     setIsResetConfirmOpen(true);
   };
 
+  const openLockConfirm = () => {
+    setError(null);
+    setIsSidebarOpen(false);
+    setIsLockConfirmOpen(true);
+  };
+
+  const closeLockConfirm = () => {
+    if (isBusy) return;
+    setIsLockConfirmOpen(false);
+  };
+
+  const confirmLockVault = async () => {
+    setIsLockConfirmOpen(false);
+    await handleLock();
+  };
+
   const closeResetConfirm = () => {
     if (isBusy) return;
     setIsResetConfirmOpen(false);
@@ -835,7 +875,8 @@ function App() {
         setIsRecoveryKeyModalOpen(false);
         setRecoveryKey(null);
 
-        setMode("locked");
+        setShowHint(false);
+        await refreshVaultStatus();
         setSuccess(
           "Vault imported successfully. Please unlock using the backup's original master password.",
         );
@@ -1018,6 +1059,12 @@ function App() {
                         onChange={(event) =>
                           setMasterPassword(event.target.value)
                         }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            void (mode === "setup" ? handleInitVault() : handleUnlock());
+                          }
+                        }}
                         placeholder={
                           mode === "setup"
                             ? "Create master password"
@@ -1070,6 +1117,12 @@ function App() {
                           id="recovery-key"
                           value={recoveryInput}
                           onChange={(e) => setRecoveryInput(e.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void handleRecoverVault();
+                            }
+                          }}
                           placeholder="XXXX-XXXX-XXXX-XXXX"
                           className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20 font-mono uppercase"
                         />
@@ -1152,7 +1205,7 @@ function App() {
         <Sidebar
           activeSection={activeSection}
           setActiveSection={setActiveSection}
-          onLock={handleLock}
+          onLock={openLockConfirm}
           isBusy={isBusy}
           theme={settings.theme}
           isOpen={isSidebarOpen}
@@ -1195,7 +1248,7 @@ function App() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={handleLock}
+                  onClick={openLockConfirm}
                   disabled={isBusy}
                   className="flex-1 md:flex-none h-11 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
                 >
@@ -1503,7 +1556,7 @@ function App() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="totp-label-modal" className="text-white/80">
-                        Account Name
+                        Label
                       </Label>
                       <Input
                         id="totp-label-modal"
@@ -1609,7 +1662,7 @@ function App() {
                                 password: e.target.value,
                               }))
                             }
-                            placeholder="Minimum 8 characters"
+                            placeholder="Minimum 6 characters"
                             className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
                           />
                           <button
@@ -1786,7 +1839,7 @@ function App() {
                                         ),
                                       )
                                     }
-                                    placeholder="Minimum 8 characters"
+                                    placeholder="Minimum 6 characters"
                                     className="h-11 rounded-2xl border-white/10 bg-black/20 text-white focus-visible:border-white/35 pr-10"
                                   />
                                   <button
@@ -1850,7 +1903,7 @@ function App() {
                     setNewEntry((prev) => ({ ...prev, notes: e.target.value }))
                   }
                   placeholder={newEntry.entryType === "note" ? "Paste your sensitive note content here..." : "Optional details..."}
-                  className={`w-full ${newEntry.entryType === "note" ? "min-h-[300px]" : "min-h-[100px]"} rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all`}
+                  className={`w-full ${newEntry.entryType === "note" ? "min-h-75" : "min-h-25"} rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all`}
                 />
               </div>
               <Button
@@ -1866,89 +1919,77 @@ function App() {
       )}
 
       {isResetConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            aria-label="Close reset confirmation dialog"
-            onClick={closeResetConfirm}
-          />
-          <Card className="relative z-10 w-full max-w-md rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)]">
-            <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
-              <CardTitle className="text-xl text-white">Reset vault?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 px-6 py-6">
-              <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+        <AlertDialog open={isResetConfirmOpen} onOpenChange={(open) => !open && closeResetConfirm()}>
+          <AlertDialogContent className="rounded-4xl border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-2xl font-bold text-white">Reset vault?</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/45 text-base">
                 This cannot be undone. All passwords on this device will be permanently wiped.
-              </div>
-              <div className="flex gap-3 sm:justify-end">
-                <Button
-                  variant="outline"
-                  onClick={closeResetConfirm}
-                  disabled={isBusy}
-                  className="h-11 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmResetVault}
-                  disabled={isBusy}
-                  className="h-11 rounded-2xl bg-white text-slate-950 hover:bg-white/90"
-                >
-                  Reset vault
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent mx-0 mb-0 p-0 sm:justify-end">
+              <AlertDialogCancel className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmResetVault}
+                className="rounded-full h-12 px-8 font-semibold transition-all shadow-lg"
+              >
+                Reset vault
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {isImportConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            aria-label="Close import confirmation dialog"
-            onClick={closeImportConfirm}
-          />
-          <Card className="relative z-10 w-full max-w-md rounded-3xl border-white/10 bg-[#151a1c]/95 shadow-[0_30px_120px_rgba(0,0,0,0.55)]">
-            <CardHeader className="border-b border-white/10 bg-white/5 px-6 py-5">
-              <CardTitle className="text-xl text-white">Import backup?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 px-6 py-6">
-              <div className="space-y-3">
-                <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
-                  This will replace your current vault data.
-                </div>
-                <div className="rounded-[22px] border border-red-500/20 bg-red-500/5 px-4 py-3 text-[13px] text-red-400">
-                  <p className="font-semibold mb-1">Important:</p>
-                  You must have the <span className="font-bold text-red-300 underline">original Master Password</span> or the <span className="font-bold text-red-300 underline">original Recovery Key</span> that belonged to the backup file. Any new keys you just saw will not work for this imported data.
-                </div>
-              </div>
-              <div className="flex gap-3 sm:justify-end">
-                <Button
-                  variant="outline"
-                  onClick={closeImportConfirm}
-                  disabled={isBusy}
-                  className="h-11 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmImportBackup}
-                  disabled={isBusy}
-                  className="h-11 rounded-2xl bg-white text-slate-950 hover:bg-white/90"
-                >
-                  Confirm Import
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <AlertDialog open={isImportConfirmOpen} onOpenChange={(open) => !open && closeImportConfirm()}>
+          <AlertDialogContent className="rounded-4xl border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-2xl font-bold text-white">Import backup?</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/45 text-base">
+                This will replace your current vault data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="rounded-[22px] border border-red-500/20 bg-red-500/5 px-4 py-3 text-[13px] text-red-400">
+              <p className="mb-1 font-semibold">Important:</p>
+              You must have the <span className="font-bold text-red-300 underline">original Master Password</span> or the <span className="font-bold text-red-300 underline">original Recovery Key</span> that belonged to the backup file. Any new keys you just saw will not work for this imported data.
+            </div>
+            <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent mx-0 mb-0 p-0 sm:justify-end">
+              <AlertDialogCancel className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmImportBackup}
+                className="rounded-full h-12 px-8 font-semibold transition-all shadow-lg"
+              >
+                Confirm Import
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {isLockConfirmOpen && (
+        <AlertDialog open={isLockConfirmOpen} onOpenChange={(open) => !open && closeLockConfirm()}>
+          <AlertDialogContent className="rounded-4xl border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-2xl font-bold text-white">Lock vault?</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/45 text-base">
+                You will be logged out and your vault data will be hidden until you unlock it again.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent mx-0 mb-0 p-0 sm:justify-end">
+              <AlertDialogCancel className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmLockVault}
+                className="rounded-full h-12 px-8 font-semibold transition-all shadow-lg"
+              >
+                Lock Vault
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {isRecoveryKeyModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl space-y-6">
             <div className="space-y-2">
               <h3 className="text-xl font-semibold text-white">

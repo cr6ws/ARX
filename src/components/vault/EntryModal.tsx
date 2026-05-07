@@ -209,7 +209,7 @@ export function EntryModal({
                         password: event.target.value,
                       }))
                     }
-                    placeholder="Minimum 8 characters"
+                    placeholder="Minimum 6 characters"
                     className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15 pr-10"
                   />
                   <button

@@ -11,6 +11,18 @@ import type { SidebarSection, VaultSettings } from "../types/vault";
 
 const STORAGE_KEY = "arx-settings";
 
+const THEME_SWATCH_CLASSES = {
+  obsidian: "bg-[#18181b]",
+  "midnight-purple": "bg-[#3b0764]",
+  "frosted-silver": "bg-slate-200",
+} as const;
+
+const THEME_DOT_CLASSES = {
+  obsidian: "bg-white",
+  "midnight-purple": "bg-[#a855f7] shadow-[0_0_12px_rgba(168,85,247,0.5)]",
+  "frosted-silver": "bg-slate-900 shadow-[0_0_12px_rgba(15,23,42,0.3)]",
+} as const;
+
 type SettingsPageProps = {
   settings: VaultSettings;
   onSettingsChange: (settings: VaultSettings) => void;
@@ -42,14 +54,14 @@ export function SettingsPage({
   }, [settings]);
 
   const handleMasterPasswordChange = async () => {
-    if (newMasterPassword.length < 8) {
-      setChangeStatus("New password must be at least 8 characters.");
+    if (newMasterPassword.length < 6) {
+      setChangeStatus("New password must be at least 6 characters.");
       return;
     }
     setIsChanging(true);
     setChangeStatus(null);
     try {
-      await invoke("change_master_password", { new_password: newMasterPassword });
+      await invoke("change_master_password", { newPassword: newMasterPassword });
       setNewMasterPassword("");
       setChangeStatus("Master password updated successfully.");
     } catch (err) {
@@ -143,18 +155,9 @@ export function SettingsPage({
                       onClick={() => onSettingsChange({ ...settings, theme: t })}
                       className={`group relative h-20 overflow-hidden rounded-2xl border transition-all ${settings.theme === t ? "border-white ring-1 ring-white/20" : "border-white/10 bg-white/5 hover:bg-white/10"}`}
                     >
-                      <div
-                        className="absolute inset-0 opacity-40 transition-opacity group-hover:opacity-60"
-                        style={{ backgroundColor: t === "obsidian" ? "#18181b" : t === "midnight-purple" ? "#3b0764" : "#e2e8f0" }}
-                      />
+                      <div className={`absolute inset-0 opacity-40 transition-opacity group-hover:opacity-60 ${THEME_SWATCH_CLASSES[t]}`} />
                       <div className="relative z-10 flex flex-col items-center gap-2">
-                        <div
-                          className="size-4 rounded-full shadow-lg"
-                          style={{
-                            backgroundColor: t === "obsidian" ? "#ffffff" : t === "midnight-purple" ? "#a855f7" : "#0f172a",
-                            boxShadow: t === "midnight-purple" ? "0 0 12px rgba(168, 85, 247, 0.5)" : t === "frosted-silver" ? "0 0 12px rgba(15, 23, 42, 0.3)" : "none"
-                          }}
-                        />
+                        <div className={`size-4 rounded-full shadow-lg ${THEME_DOT_CLASSES[t]}`} />
                         <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
                           {t === "frosted-silver" ? "Frosted Light" : t.split("-")[0]}
                         </span>
@@ -251,12 +254,13 @@ export function SettingsPage({
                   <input
                     id="gen-length"
                     type="range"
-                    min="8"
+                    min="6"
                     max="64"
+                    aria-label="Password generator length"
                     value={settings.generator.length}
                     onChange={(e) => onSettingsChange({
                       ...settings,
-                      generator: { ...settings.generator, length: parseInt(e.target.value) }
+                      generator: { ...settings.generator, length: Math.max(6, parseInt(e.target.value)) }
                     })}
                     className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
                   />

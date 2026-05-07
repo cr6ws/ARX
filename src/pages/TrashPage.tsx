@@ -98,7 +98,7 @@ const TrashEntryRow = memo(({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="px-6 py-4 transition-colors duration-200 hover:bg-white/[0.02] border-b border-white/5 last:border-0"
+      className="px-6 py-4 transition-colors duration-200 hover:bg-white/2 border-b border-white/5 last:border-0"
     >
       <div className="grid grid-cols-[48px_minmax(0,1fr)_120px_140px] items-center gap-4 text-[13px] sm:text-sm">
         <EntryLogo entry={entry} />
@@ -139,19 +139,19 @@ const TrashEntryRow = memo(({
                 <Trash2 className="size-3.5" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="border-white/10 bg-zinc-950/95 text-white backdrop-blur-xl">
+            <AlertDialogContent className="rounded-4xl border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Forever?</AlertDialogTitle>
-                <AlertDialogDescription className="text-white/60">
+                <AlertDialogTitle className="text-2xl font-bold text-white">Delete Forever?</AlertDialogTitle>
+                <AlertDialogDescription className="text-white/45 text-base">
                   This action cannot be undone. This account and its password will be permanently removed from your vault.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="border-white/10 bg-white/5 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+              <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent mx-0 mb-0 p-0 sm:justify-end">
+                <AlertDialogCancel className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors">Cancel</AlertDialogCancel>
                 <AlertDialogAction 
                   onClick={() => onDeleteForever(entry.id)}
                   variant="destructive"
-                  className="bg-red-500 text-white hover:bg-red-600 border-none"
+                  className="rounded-full h-12 px-8 font-semibold transition-all shadow-lg"
                 >
                   Delete Forever
                 </AlertDialogAction>
@@ -184,7 +184,7 @@ export function TrashPage({
         <CardContent className="px-0 py-0">
           {entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="flex size-16 items-center justify-center rounded-3xl border border-white/5 bg-white/[0.02] text-white/20">
+              <div className="flex size-16 items-center justify-center rounded-3xl border border-white/5 bg-white/2 text-white/20">
                 <Trash2 className="size-8" />
               </div>
               <h3 className="mt-4 text-lg font-medium text-white/60">Trash is empty</h3>

@@ -50,7 +50,7 @@ export function AuthenticatorPage({
     const query = searchTerm.toLowerCase();
     return e.label.toLowerCase().includes(query) ||
       e.username.toLowerCase().includes(query);
-  });
+  }).sort((a, b) => a.updatedAt - b.updatedAt);
 
   const fetchCodes = async () => {
     if (totpEntries.length === 0) return;
@@ -139,7 +139,7 @@ export function AuthenticatorPage({
       </div>
 
       {filteredEntries.length === 0 ? (
-        <Card className="rounded-[32px] border-white/10 bg-white/5 backdrop-blur-3xl p-20 text-center">
+        <Card className="rounded-4xl border-white/10 bg-white/5 backdrop-blur-3xl p-20 text-center">
           <div className="max-w-sm mx-auto space-y-6">
             <div className="size-20 mx-auto rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center text-theme-accent">
               <ShieldCheck className="size-10" />
@@ -170,7 +170,7 @@ export function AuthenticatorPage({
             return (
               <Card
                 key={entry.id}
-                className="group relative rounded-[28px] border-white/10 bg-white/5 hover:bg-white/[0.08] transition-all overflow-hidden"
+                className="group relative rounded-3xl border-white/10 bg-white/5 hover:bg-white/8 transition-all overflow-hidden"
               >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -197,7 +197,7 @@ export function AuthenticatorPage({
                           <X className="size-4" />
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[32px] border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
+                      <AlertDialogContent className="rounded-4xl border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-2xl font-bold text-white">Remove Account?</AlertDialogTitle>
                           <AlertDialogDescription className="text-white/45 text-base">
@@ -205,7 +205,7 @@ export function AuthenticatorPage({
                             You'll lose access to your 2FA codes for this account unless you have a backup of the secret key.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent -mx-0 -mb-0 p-0 sm:justify-end">
+                        <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent mx-0 mb-0 p-0 sm:justify-end">
                           <AlertDialogCancel className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors">
                             Keep Account
                           </AlertDialogCancel>

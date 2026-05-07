@@ -66,8 +66,8 @@ pub fn normalize_entry_input(input: &VaultEntryInput) -> VaultEntryInput {
 }
 
 fn validate_password_strength(password: &str) -> Result<(), String> {
-    if password.len() < 8 {
-        return Err("Password must be at least 8 characters.".to_string());
+    if password.len() < 6 {
+        return Err("Password must be at least 6 characters.".to_string());
     }
     let lower = password.to_lowercase();
     let weak_patterns = [

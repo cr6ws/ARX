@@ -46,8 +46,8 @@ export function SecureNotesPage({
     // Sort favorites first
     if (a.isFavorite && !b.isFavorite) return -1;
     if (!a.isFavorite && b.isFavorite) return 1;
-    // Then sort by update time (newest first)
-    return b.updatedAt - a.updatedAt;
+    // Then sort by update time (oldest first) so new items stack after existing ones
+    return a.updatedAt - b.updatedAt;
   });
 
   return (
@@ -67,7 +67,7 @@ export function SecureNotesPage({
       </div>
 
       {filteredNotes.length === 0 ? (
-        <Card className="rounded-[32px] border-white/10 bg-white/5 backdrop-blur-3xl p-20 text-center">
+        <Card className="rounded-4xl border-white/10 bg-white/5 backdrop-blur-3xl p-20 text-center">
           <div className="max-w-sm mx-auto space-y-6">
             <div className="size-20 mx-auto rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center">
               <FileText className="size-10 text-white/20" />
@@ -95,7 +95,7 @@ export function SecureNotesPage({
             <Card
               key={note.id}
               onClick={() => onEditNote(note.id)}
-              className="group relative rounded-[24px] border-white/10 bg-white/5 hover:bg-white/[0.08] transition-all cursor-pointer overflow-hidden p-6"
+              className="group relative rounded-3xl border-white/10 bg-white/5 hover:bg-white/8 transition-all cursor-pointer overflow-hidden p-6"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 group-hover:text-white transition-colors">
@@ -113,7 +113,7 @@ export function SecureNotesPage({
                         <Trash2 className="size-4" />
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent className="rounded-[32px] border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
+                    <AlertDialogContent className="rounded-4xl border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-2xl font-bold text-white">Delete Note?</AlertDialogTitle>
                         <AlertDialogDescription className="text-white/45 text-base">
@@ -121,7 +121,7 @@ export function SecureNotesPage({
                           This action cannot be undone and you will lose all information stored in this note.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent -mx-0 -mb-0 p-0 sm:justify-end">
+                      <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent mx-0 mb-0 p-0 sm:justify-end">
                         <AlertDialogCancel 
                           onClick={(e) => e.stopPropagation()}
                           className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors"

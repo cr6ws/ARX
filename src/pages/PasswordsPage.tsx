@@ -122,7 +122,7 @@ const EntryRow = memo(({
       ref={(node: any) => {
         if (node) rowRefs.current[entry.id] = node as unknown as HTMLDivElement;
       }}
-      className={`px-6 py-3 transition-colors duration-200 hover:bg-white/[0.02] cursor-default border-b border-white/5 last:border-0 select-none ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""} ${entry.isFavorite ? "bg-white/[0.03]" : ""}`}
+      className={`px-6 py-3 transition-colors duration-200 hover:bg-white/2 cursor-default border-b border-white/5 last:border-0 select-none ${pulseEntryId === entry.id ? "rounded-2xl bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)]" : ""} ${entry.isFavorite ? "bg-white/3" : ""}`}
     >
       <div className={rowClassName}>
         <div 
@@ -187,19 +187,19 @@ const EntryRow = memo(({
                 <Trash2 className="size-3.5" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="border-white/10 bg-zinc-950/95 text-white backdrop-blur-xl">
+            <AlertDialogContent className="rounded-4xl border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl">
               <AlertDialogHeader>
-                <AlertDialogTitle>Move to Trash?</AlertDialogTitle>
-                <AlertDialogDescription className="text-white/60">
+                <AlertDialogTitle className="text-2xl font-bold text-white">Move to Trash?</AlertDialogTitle>
+                <AlertDialogDescription className="text-white/45 text-base">
                   This item will be moved to the Trash Bin. You can restore it within 30 days before it's permanently deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="border-white/10 bg-white/5 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+              <AlertDialogFooter className="mt-6 gap-3 border-none bg-transparent mx-0 mb-0 p-0 sm:justify-end">
+                <AlertDialogCancel className="rounded-full h-12 px-6 border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors">Cancel</AlertDialogCancel>
                 <AlertDialogAction 
                   onClick={() => onDelete(entry.id)}
                   variant="destructive"
-                  className="bg-red-500 text-white hover:bg-red-600 border-none"
+                  className="rounded-full h-12 px-8 font-semibold transition-all shadow-lg"
                 >
                   Move to Trash
                 </AlertDialogAction>
