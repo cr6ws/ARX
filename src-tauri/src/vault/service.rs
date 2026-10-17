@@ -450,6 +450,26 @@ pub fn change_master_password(session: &mut VaultSession, new_password: &str) ->
     Ok(())
 }
 
+pub fn update_hint(session: &mut VaultSession, hint: Option<String>) -> Result<(), String> {
+    let path = session
+        .vault_path
+        .as_ref()
+        .ok_or_else(|| "Vault path is missing.".to_string())?;
+
+    let clean_hint = hint.map(|h| h.trim().to_string()).filter(|h| !h.is_empty());
+    if let Some(ref h) = clean_hint {
+        if h.chars().count() > 100 {
+            return Err("Password hint must be at most 100 characters.".to_string());
+        }
+    }
+    let mut file = storage::read_vault_file(path)?;
+    file.hint_b64 = clean_hint.as_ref().map(|h| STANDARD.encode(h));
+    storage::write_vault_file(path, &file)?;
+
+    session.hint = clean_hint;
+    Ok(())
+}
+
 pub fn regenerate_recovery_key(session: &mut VaultSession) -> Result<String, String> {
     let master_key = session
         .key

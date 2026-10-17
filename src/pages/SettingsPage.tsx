@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Download, Upload, Eye, EyeOff } from "lucide-react";
+import { Download, Upload, Eye, EyeOff, Pencil, X } from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -30,6 +30,8 @@ type SettingsPageProps = {
   onImportBackup: () => void;
   onRegenerateRecoveryKey: () => void;
   onResetVault: () => void;
+  currentHint: string | null;
+  onUpdateHint: (hint: string | null) => Promise<void>;
 };
 
 export function SettingsPage({
@@ -38,13 +40,21 @@ export function SettingsPage({
   onExportBackup,
   onImportBackup,
   onRegenerateRecoveryKey,
-  onResetVault
+  onResetVault,
+  currentHint,
+  onUpdateHint,
 }: SettingsPageProps) {
   const [saved, setSaved] = useState(false);
   const [newMasterPassword, setNewMasterPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
-  const [changeStatus, setChangeStatus] = useState<string | null>(null);
+  const [changeStatus, setChangeStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Hint management state
+  const [isEditingHint, setIsEditingHint] = useState(false);
+  const [hintDraft, setHintDraft] = useState("");
+  const [isSavingHint, setIsSavingHint] = useState(false);
+  const [hintStatus, setHintStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -54,8 +64,9 @@ export function SettingsPage({
   }, [settings]);
 
   const handleMasterPasswordChange = async () => {
-    if (newMasterPassword.length < 6) {
-      setChangeStatus("New password must be at least 6 characters.");
+    if (isChanging) return;
+    if (newMasterPassword.length !== 6) {
+      setChangeStatus({ type: "error", message: "New password must be exactly 6 characters." });
       return;
     }
     setIsChanging(true);
@@ -63,11 +74,53 @@ export function SettingsPage({
     try {
       await invoke("change_master_password", { newPassword: newMasterPassword });
       setNewMasterPassword("");
-      setChangeStatus("Master password updated successfully.");
+      setChangeStatus({ type: "success", message: "Master password updated successfully." });
     } catch (err) {
-      setChangeStatus(String(err));
+      setChangeStatus({ type: "error", message: String(err) });
     } finally {
       setIsChanging(false);
+    }
+  };
+
+  const openHintEditor = () => {
+    setHintDraft(currentHint ?? "");
+    setHintStatus(null);
+    setIsEditingHint(true);
+  };
+
+  const cancelHintEdit = () => {
+    setIsEditingHint(false);
+    setHintDraft("");
+    setHintStatus(null);
+  };
+
+  const handleSaveHint = async () => {
+    if (isSavingHint) return;
+    const trimmed = hintDraft.trim();
+    if (trimmed.length > 100) {
+      setHintStatus({
+        type: "error",
+        message: "Password hint must be 100 characters or less.",
+      });
+      return;
+    }
+    setIsSavingHint(true);
+    setHintStatus(null);
+    try {
+      await onUpdateHint(trimmed.length > 0 ? trimmed : null);
+      setIsEditingHint(false);
+      setHintDraft("");
+      setHintStatus({
+        type: "success",
+        message: trimmed.length > 0 ? "Password hint updated." : "Password hint cleared.",
+      });
+    } catch (err) {
+      setHintStatus({
+        type: "error",
+        message: String(err),
+      });
+    } finally {
+      setIsSavingHint(false);
     }
   };
 
@@ -201,8 +254,9 @@ export function SettingsPage({
                       id="new-master-password"
                       type={showNewPassword ? "text" : "password"}
                       value={newMasterPassword}
-                      onChange={(e) => setNewMasterPassword(e.target.value)}
-                      placeholder="Enter new master password"
+                      onChange={(e) => setNewMasterPassword(e.target.value.slice(0, 6))}
+                      maxLength={6}
+                      placeholder="Enter exactly 6 characters"
                       className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15 pr-10"
                     />
                     <button
@@ -215,17 +269,88 @@ export function SettingsPage({
                   </div>
                 </div>
                 {changeStatus && (
-                  <p className={`text-xs ${changeStatus.includes("success") ? "text-green-400" : "text-red-400"}`}>
-                    {changeStatus}
+                  <p className={`text-xs ${changeStatus.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                    {changeStatus.message}
                   </p>
                 )}
                 <Button
                   onClick={handleMasterPasswordChange}
-                  disabled={isChanging || !newMasterPassword}
+                  disabled={isChanging || newMasterPassword.length !== 6}
                   className="h-11 w-full rounded-2xl bg-white text-slate-950 hover:bg-white/90 font-semibold"
                 >
                   {isChanging ? "Updating..." : "Update Master Password"}
                 </Button>
+              </div>
+
+              {/* Password Hint */}
+              <div className="pt-6 border-t border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase tracking-widest text-white/40 font-semibold">
+                    Password Hint
+                  </Label>
+                  {!isEditingHint && (
+                    <button
+                      type="button"
+                      onClick={openHintEditor}
+                      className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors"
+                    >
+                      <Pencil className="size-3" />
+                      {currentHint ? "Edit" : "Add hint"}
+                    </button>
+                  )}
+                </div>
+
+                {!isEditingHint ? (
+                  <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 min-h-[44px] flex items-center">
+                    {currentHint ? (
+                      <p className="text-sm text-white/70 italic">{currentHint}</p>
+                    ) : (
+                      <p className="text-sm text-white/25 italic">No hint set</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <Input
+                      id="hint-draft"
+                      value={hintDraft}
+                      onChange={(e) => setHintDraft(e.target.value)}
+                      maxLength={100}
+                      placeholder="e.g. My childhood pet's name"
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-white/15"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); void handleSaveHint(); }
+                        if (e.key === "Escape") cancelHintEdit();
+                      }}
+                      autoFocus
+                    />
+                    <p className="text-[11px] text-white/35 leading-relaxed">
+                      Leave blank to clear the hint. The hint is displayed as plain text on the lock screen.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSaveHint}
+                        disabled={isSavingHint}
+                        className="flex-1 h-10 rounded-xl bg-white text-slate-950 hover:bg-white/90 font-semibold text-sm"
+                      >
+                        {isSavingHint ? "Saving..." : "Save Hint"}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={cancelHintEdit}
+                        className="flex items-center justify-center size-10 rounded-xl border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                        aria-label="Cancel"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {hintStatus && (
+                  <p className={`text-xs ${hintStatus.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                    {hintStatus.message}
+                  </p>
+                )}
               </div>
 
               <div className="pt-6 border-t border-white/10 space-y-4">

@@ -22,6 +22,8 @@ import {
   Gamepad2,
   Menu
 } from "lucide-react";
+import { motion } from "motion/react";
+import { cn } from "./lib/utils";
 import { CommandPalette } from "./components/CommandPalette";
 import arxLogo from "./assets/ARX.png";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -136,6 +138,95 @@ function generatePassword(settings: VaultSettings["generator"]) {
 }
 
 
+interface PasscodeInputProps {
+  value: string;
+  onChange: (val: string) => void;
+  onEnter: () => void;
+  isShaking: boolean;
+  isBusy: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}
+
+function PasscodeInput({
+  value,
+  onChange,
+  onEnter,
+  isShaking,
+  isBusy,
+  inputRef,
+}: PasscodeInputProps) {
+  return (
+    <div
+      className="relative flex items-center justify-center py-2 cursor-text"
+      onClick={() => inputRef.current?.focus()}
+    >
+      <input
+        ref={inputRef}
+        id="passcode-input"
+        aria-label="Master Password (6 characters)"
+        aria-describedby="passcode-counter"
+        type="password"
+        value={value}
+        onChange={(event) => onChange(event.target.value.slice(0, 6))}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onEnter();
+          }
+        }}
+        maxLength={6}
+        autoComplete="current-password"
+        autoFocus
+        disabled={isBusy}
+        className="absolute inset-0 size-full opacity-0 cursor-default"
+      />
+
+      <motion.div
+        animate={
+          isShaking
+            ? { x: [-12, 12, -9, 9, -5, 5, 0], transition: { duration: 0.45 } }
+            : { x: 0 }
+        }
+        className="flex items-center justify-center gap-2"
+      >
+        {[0, 1, 2, 3, 4, 5].map((index) => {
+          const isFilled = index < value.length;
+          const isCurrent = index === value.length && !isBusy;
+          return (
+            <div
+              key={index}
+              className={cn(
+                "size-11 sm:size-12 rounded-2xl flex items-center justify-center transition-all duration-200 border",
+                isShaking
+                  ? "border-red-500/70 bg-red-500/15 shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+                  : isCurrent
+                    ? "border-white bg-white/10 ring-2 ring-white/20 shadow-[0_0_12px_rgba(255,255,255,0.15)]"
+                    : isFilled
+                      ? "border-white/40 bg-white/10"
+                      : "border-white/15 bg-black/40 hover:border-white/25"
+              )}
+            >
+              {isFilled && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  className={cn(
+                    "size-2.5 rounded-full",
+                    isShaking
+                      ? "bg-red-400"
+                      : "bg-white shadow-[0_0_8px_rgba(255,255,255,0.85)]"
+                  )}
+                />
+              )}
+            </div>
+          );
+        })}
+      </motion.div>
+    </div>
+  );
+}
+
 function App() {
   const [mode, setMode] = useState<VaultMode>("loading");
   const [isBusy, setIsBusy] = useState(false);
@@ -145,6 +236,9 @@ function App() {
   const [masterPasswordHint, setMasterPasswordHint] = useState("");
   const [vaultHint, setVaultHint] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+  const unlockInputRef = useRef<HTMLInputElement | null>(null);
+  const shakeTimerRef = useRef<number | null>(null);
   const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
   const [isRecoveryKeyModalOpen, setIsRecoveryKeyModalOpen] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
@@ -347,6 +441,34 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [success]);
 
+  useEffect(() => {
+    if (mode === "locked") {
+      const timer = window.setTimeout(() => {
+        unlockInputRef.current?.focus();
+      }, 100);
+      return () => window.clearTimeout(timer);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    return () => {
+      if (shakeTimerRef.current) {
+        window.clearTimeout(shakeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const triggerShake = () => {
+    if (shakeTimerRef.current) {
+      window.clearTimeout(shakeTimerRef.current);
+    }
+    setIsShaking(true);
+    shakeTimerRef.current = window.setTimeout(() => {
+      setIsShaking(false);
+      unlockInputRef.current?.focus();
+    }, 450);
+  };
+
   const loadEntries = async () => {
     setIsBusy(true);
     setError(null);
@@ -374,8 +496,9 @@ function App() {
   };
 
   const handleInitVault = async () => {
-    if (masterPassword.length < 6) {
-      setError("Master password must be at least 6 characters.");
+    if (isBusy) return;
+    if (masterPassword.length !== 6) {
+      setError("Master password must be exactly 6 characters.");
       return;
     }
     setIsBusy(true);
@@ -397,19 +520,24 @@ function App() {
     }
   };
 
-  const handleUnlock = async () => {
-    if (masterPassword.length < 6) {
-      setError("Master password must be at least 6 characters.");
+  const handleUnlock = async (directPasscode?: string) => {
+    if (isBusy) return;
+    const pwd = directPasscode ?? masterPassword;
+    if (pwd.length !== 6) {
+      setError("Master password must be exactly 6 characters.");
+      triggerShake();
       return;
     }
     setIsBusy(true);
     setError(null);
     try {
-      await invoke("unlock_vault", { masterPassword });
+      await invoke("unlock_vault", { masterPassword: pwd });
       setMasterPassword("");
       await refreshVaultStatus();
     } catch (err) {
       setError(String(err));
+      setMasterPassword("");
+      triggerShake();
     } finally {
       setIsBusy(false);
     }
@@ -427,6 +555,8 @@ function App() {
       setNewEntry(EMPTY_ENTRY);
       setRevealId(null);
       setRevealedPassword(null);
+      setMasterPassword("");
+      setMasterPasswordHint("");
       if (clipboardTimer.current) {
         window.clearTimeout(clipboardTimer.current);
         clipboardTimer.current = null;
@@ -491,6 +621,11 @@ function App() {
     } finally {
       setIsBusy(false);
     }
+  };
+
+  const handleUpdateHint = async (hint: string | null): Promise<void> => {
+    await invoke("update_hint", { hint: hint?.trim() || null });
+    await refreshVaultStatus();
   };
 
   const openAddNoteModal = () => {
@@ -1042,63 +1177,95 @@ function App() {
                 )}
 
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="unlock-password"
-                      className="text-sm text-white/80"
-                    >
-                      {mode === "setup"
-                        ? "New master password"
-                        : "Master password"}
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="unlock-password"
-                        type={showMasterPassword ? "text" : "password"}
+                  {mode === "setup" ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="setup-password"
+                          className="text-sm text-white/80"
+                        >
+                          Master Password (6 characters)
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="setup-password"
+                            type={showMasterPassword ? "text" : "password"}
+                            value={masterPassword}
+                            onChange={(event) =>
+                              setMasterPassword(event.target.value.slice(0, 6))
+                            }
+                            maxLength={6}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                void handleInitVault();
+                              }
+                            }}
+                            placeholder="Create 6-character code"
+                            className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20 pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowMasterPassword(!showMasterPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                          >
+                            {showMasterPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-white/40">
+                          Must be exactly 6 characters (letters, numbers, or symbols).
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="setup-hint"
+                          className="text-sm text-white/80"
+                        >
+                          Password hint (optional)
+                        </Label>
+                        <Input
+                          id="setup-hint"
+                          value={masterPasswordHint}
+                          maxLength={100}
+                          onChange={(event) =>
+                            setMasterPasswordHint(event.target.value)
+                          }
+                          placeholder="e.g. My childhood pet's name"
+                          className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="passcode-input" className="text-sm text-white/80">
+                          Enter Master Password
+                        </Label>
+                        <span id="passcode-counter" className="text-xs text-white/40 font-mono">
+                          {masterPassword.length}/6
+                        </span>
+                      </div>
+
+                      <PasscodeInput
                         value={masterPassword}
-                        onChange={(event) =>
-                          setMasterPassword(event.target.value)
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void (mode === "setup" ? handleInitVault() : handleUnlock());
+                        onChange={(val) => {
+                          setMasterPassword(val);
+                          if (val.length === 6 && !isBusy) {
+                            void handleUnlock(val);
                           }
                         }}
-                        placeholder={
-                          mode === "setup"
-                            ? "Create master password"
-                            : "Enter master password"
-                        }
-                        className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20 pr-10"
+                        onEnter={() => void handleUnlock()}
+                        isShaking={isShaking}
+                        isBusy={isBusy}
+                        inputRef={unlockInputRef}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowMasterPassword(!showMasterPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-                      >
-                        {showMasterPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
-                    </div>
-                  </div>
 
-                  {mode === "setup" && (
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="setup-hint"
-                        className="text-sm text-white/80"
-                      >
-                        Password hint (optional)
-                      </Label>
-                      <Input
-                        id="setup-hint"
-                        value={masterPasswordHint}
-                        onChange={(event) =>
-                          setMasterPasswordHint(event.target.value)
-                        }
-                        placeholder="e.g. My childhood pet's name"
-                        className="h-12 rounded-2xl border-white/15 bg-black text-white placeholder:text-white/30 focus-visible:border-white focus-visible:ring-white/20"
-                      />
+                      {isBusy && (
+                        <p className="text-center text-xs text-white/50 animate-pulse pt-1">
+                          Unlocking vault...
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1147,19 +1314,19 @@ function App() {
                     </div>
                   ) : (
                     <>
-                      <Button
-                        onClick={
-                          mode === "setup" ? handleInitVault : handleUnlock
-                        }
-                        disabled={isBusy}
-                        size="lg"
-                        className="h-12 w-full rounded-2xl border border-white bg-white text-sm font-semibold text-black shadow-none hover:bg-white/90"
-                      >
-                        {mode === "setup" ? "Create vault" : "Unlock vault"}
-                      </Button>
+                      {mode === "setup" && (
+                        <Button
+                          onClick={handleInitVault}
+                          disabled={isBusy || masterPassword.length !== 6}
+                          size="lg"
+                          className="h-12 w-full rounded-2xl border border-white bg-white text-sm font-semibold text-black shadow-none hover:bg-white/90"
+                        >
+                          {isBusy ? "Creating vault..." : "Create vault"}
+                        </Button>
+                      )}
 
                       {mode !== "setup" && (
-                        <div className="text-center space-y-4">
+                        <div className="text-center space-y-4 pt-1">
                           <div className="flex flex-col gap-2">
                             {vaultHint && (
                               <>
@@ -1179,7 +1346,13 @@ function App() {
                             )}
                             <button
                               type="button"
-                              onClick={() => setIsRecovering(true)}
+                              onClick={() => {
+                                if (shakeTimerRef.current) {
+                                  window.clearTimeout(shakeTimerRef.current);
+                                }
+                                setIsShaking(false);
+                                setIsRecovering(true);
+                              }}
                               className="text-xs text-white/45 hover:text-white transition-colors"
                             >
                               Lost password? Use Recovery Key
@@ -1419,6 +1592,8 @@ function App() {
                 onImportBackup={openImportConfirm}
                 onRegenerateRecoveryKey={handleRegenerateRecoveryKey}
                 onResetVault={openResetConfirm}
+                currentHint={vaultHint}
+                onUpdateHint={handleUpdateHint}
               />
             )}
             {activeSection === "notes" && (

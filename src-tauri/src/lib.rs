@@ -287,6 +287,16 @@ fn import_vault(backup: VaultBackup, state: State<AppState>) -> Result<(), Strin
 }
 
 #[tauri::command]
+fn update_hint(hint: Option<String>, state: State<AppState>) -> Result<(), String> {
+    let mut session = state
+        .session
+        .lock()
+        .map_err(|_| "State lock poisoned.".to_string())?;
+    security::ensure_unlocked(&session)?;
+    service::update_hint(&mut session, hint)
+}
+
+#[tauri::command]
 fn change_master_password(new_password: String, state: State<AppState>) -> Result<(), String> {
     let mut session = state
         .session
@@ -358,6 +368,7 @@ pub fn run() {
             export_vault,
             import_vault,
             change_master_password,
+            update_hint,
             recover_vault,
             get_audit_stats,
             get_trash_passwords,
